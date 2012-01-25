@@ -16,9 +16,9 @@ limitations under the License.
 Ristretto
 
 Contains tests for the type contracts written using QUnit. To execute
-tests simply open the file in a web browser.
+tests simply open qunit.html in a web browser.
 
-Author: Samuel Li <samli@codesphere.com>, Shane Stephens <shanes@chromium.org>
+Authors: Samuel Li <samli@codesphere.com> and Shane Stephens <shans@chromium.org>
 */
 
 var T = Contract.T;
@@ -273,14 +273,7 @@ $(document).ready(function() {
         var joe = getPersonR(30);
 
         raises(function() { noBoundary(joe); }, "Function trying to modify protected object");
-        //TODO:
-        //strictEqual(noBoundary(sam), 50, "Function modifying unprotected object");
-        // Not sure if the above is expected behaviour
-        // Sam was restricted then relaxed while Joe was restricted, but should they behave in 
-        // the same way when passed into this function? Not sure if the current result makes 
-        // much sense.
-
-        deepEqual(sam, {age: 20, gender: "male"}, "Should be identical to how it started");
+        raises(function() { noBoundary(sam); }, "Function modifying unprotected object");
     });
 
     test("Manipulating objects", function() {
@@ -309,8 +302,6 @@ $(document).ready(function() {
 
         var badManipulateR = T("badManipulate :: {a: Int, b: Int -> Int} -> Int", badManipulate);
 
-        //TODO:
-        // Unsure of expected behaviour - see above
         raises(function() { badManipulateR(myObject); }, "Manipulating an object incorrectly");
     });
 
@@ -464,10 +455,6 @@ $(document).ready(function() {
 
         strictEqual(lookupR("3", {3: "foo"}), "foo", "Valid lookup with contract");
         strictEqual(lookupR("3", {3: 4}), 4, "Valid lookup with contract");
-        //TODO:
-        // Should pass, currently fails. It does not return type b, but
-        // it shouldn't really be expected to when the entry doesn't exist
-        // strictEqual(lookupR("foo", {3: "foo"}), undefined, "No matching entry with contract");
         raises(function() { lookupR("3", {3: "foo", 4: 5}); }, "Mixed dictionary with contract");
 
         strictEqual(badLookup("3", {3: "foo"}), 3, "Valid lookup");
@@ -805,10 +792,6 @@ $(document).ready(function() {
 
         strictEqual(pointlessR(500, getSizeR), 5000, "Valid chain, explicit brackets");
 
-        //var pointlessR2 = T("pointless :: Int -> 0 -> Int -> Int", pointless);
-
-        //strictEqual(pointlessR2(500, getSizeR), 5000, "Valid chain, no brackets");
-
         function add(num, fn) {
             return function() { return num + fn(); };
         }
@@ -817,19 +800,7 @@ $(document).ready(function() {
         raises(function () { T("add :: Int -> (0 -> Int) -> 0", add); }, "Invalid use of no params");
 
         strictEqual(addR(1000, getSize)(), 6000, "Valid chain of functions, explicit brackets");
-/*
-        var addR2 = T("add :: Int -> 0 -> Int -> 0 -> Int", add);
 
-        strictEqual(addR2(1000, getSize)(), 6000, "Valid chain of functions, no brackets");
-
-        function addMore(a,b,fn) {
-            return function() { return a+b+fn(); };
-        }
-
-        var addMoreR = T("addMore :: Int -> Int -> 0 -> Int -> 0 -> Int", addMore);
-
-        strictEqual(addMore(5, 100, getSize)(), 5105, "More parameters");
-*/
         function nothing() {}
 
         var nothingR = T("nothing :: 0 -> Int?", nothing);
@@ -843,15 +814,6 @@ $(document).ready(function() {
         var trickyR = T("tricky :: Int -> 0 -> String?", tricky);
 
         strictEqual(trickyR(100)(), undefined, "Mixing empty params with maybe type");
-
-        /*function wrap() {
-            return addMore;
-        }
-
-        var wrapR = T("wrap :: 0 -> (Int -> Int -> 0 -> Int -> 0 -> Int)", wrap);
-
-        strictEqual(wrap()(5, 100, getSize)(), 5105, "Valid chaining of functions");
-        */
 
         var x = 5;
         function incrementGlobal () {

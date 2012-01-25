@@ -17,7 +17,7 @@ Ristretto
 
 Contains runtime type contracts for Javascript.
 
-Author: Samuel Li <samli@codesphere.com>, Shane Stephens <shanes@chromium.org>
+Authors: Samuel Li <samli@codesphere.com> and Shane Stephens <shans@chromium.org>
 */
 
 (function(){
@@ -161,9 +161,9 @@ function UnitContractFactory() {
     return f;
 }
 
-function ListContract(label, itemContractFactory) {
+function ListContract(label, itemContract) {
     Contract.bind(this)(label);
-    var itemContract = itemContractFactory(label);
+    var itemContract = itemContract;
 
     this.restrict = function(x) {
         var out = [];
@@ -176,6 +176,9 @@ function ListContract(label, itemContractFactory) {
 
         // Overwriting push function.
         out.push = function (item) {
+            // In the case of variable contracts being used an item 
+            // must first be relaxed before being restricted. We need
+            // to do this to all elements so homogenous types are ensured.
             for (var i = 0; i < this.length; i++) {
                 this[i] = itemContract.relax(this[i]);
             }
@@ -205,12 +208,12 @@ function ListContract(label, itemContractFactory) {
 
 ListContract.prototype.__proto__ = Contract.prototype;
 
-function ListContractFactory(itemContract) {
+function ListContractFactory(itemContractFactory) {
     var f = function(label) {
-        return new ListContract(label, itemContract);
+        return new ListContract(label, itemContractFactory(label));
     }
     f.repr = function() {
-        return "ListContractFactory(" + itemContract.repr() + ")";
+        return "ListContractFactory(" + itemContractFactory.repr() + ")";
     }
     return f;
 }
@@ -222,7 +225,7 @@ function MapContract(label, keyContract, valueContract) {
         if (!x) { this.fail(); }
         var out = {}
         for (var key in x) {
-            out[keyContract(label).restrict(key)] = valueContract(label).restrict(x[key]);
+            out[keyContract.restrict(key)] = valueContract.restrict(x[key]);
         }
         return out;
     }
@@ -231,7 +234,7 @@ function MapContract(label, keyContract, valueContract) {
         if (!x) { this.fail(); }
         var out = {}
         for (var key in x) {
-            out[keyContract(label).relax(key)] = valueContract(label).relax(x[key]);
+            out[keyContract.relax(key)] = valueContract.relax(x[key]);
         }
         return out;
     }
@@ -239,12 +242,12 @@ function MapContract(label, keyContract, valueContract) {
 
 MapContract.prototype.__proto__ = Contract.prototype;
 
-function MapContractFactory(keyContract, valueContract) {
+function MapContractFactory(keyContractFactory, valueContractFactory) {
     var f = function(label) {
-        return new MapContract(label, keyContract, valueContract);
+        return new MapContract(label, keyContractFactory(label), valueContractFactory(label));
     }
     f.repr = function() {
-        return "MapContractFactory(" + keyContract.repr() + ", " + valueContract.repr() + ")";
+        return "MapContractFactory(" + keyContractFactory.repr() + ", " + valueContractFactory.repr() + ")";
     }
     return f;
 }
@@ -327,18 +330,20 @@ function VariableContractFactoryPlaceholder(name) {
 // output: FunctionContract(_, first arg type, result type).restrict(input)
 // desired behaviour of output: a function that takes a single argument of appropriate type
 // and if result is a FunctionContract returns a suspension, else returns the result.
-// isRet specifies whether or not this is the function contract which contains the return value
-// as a the range. This allows for functions to be returned from a function.
 function FunctionContract(label, domain, range) {
     Contract.bind(this)(label);
     this.domain = domain;
     this.range = range;
 
+    // The parameter numArgs specifies the number of arguments that should be expected.
+    // If it is the last argument, then we simply call the function. If numArgs is not
+    // specified, the number of arguments is predicted and used.
     this.restrict = function(f, numArgs) {
         if (typeof f != 'function') { this.fail(); }
         // Only adds an extra layer if the range is a function, the domain isn't an EmptyContract
         // and if num args is provided that there is more than 1 arg required. If num args isn't provided
         // we simply try to infer the number of arguments.
+        // TODO: Simplify logic here
         if (range.__proto__.constructor == FunctionContract &&
                 domain.__proto__.constructor != EmptyContract &&
                 (numArgs === undefined || numArgs > 1) &&
@@ -363,6 +368,9 @@ function FunctionContract(label, domain, range) {
                     function() {
                         var args2 = Array.prototype.slice.apply(arguments);
                         args2 = [domain.relax(args[0])].concat(args2);
+                        if (domain.__proto__.constructor == ObjectContract) {
+                            domain.restrict(args[0]);
+                        }
                         return f.apply(null, args2)
                     }, numArgs - 1
                 );
@@ -383,6 +391,9 @@ function FunctionContract(label, domain, range) {
                 }
                 var restOfArgs = args.slice(1);
                 var result = range.restrict(f(domain.relax(x)));
+                if (domain.__proto__.constructor == ObjectContract) {
+                    domain.restrict(x);
+                }
                 if (restOfArgs.length == 0) {
                     return result;
                 }
@@ -391,7 +402,6 @@ function FunctionContract(label, domain, range) {
         }
     }
 
-    //TODO:
     this.relax = function(f, numArgs) {
         if (typeof f != 'function') { this.fail(); }
         if (range.__proto__.constructor == FunctionContract &&
@@ -418,6 +428,8 @@ function FunctionContract(label, domain, range) {
             }
         } else {
             return function(x) {
+                // Rest of the arguments are captured and we continue to apply
+                // arguments in order to preserve identical behaviour in currying.
                 var args = Array.prototype.slice.apply(arguments);
                 if (domain.__proto__.constructor == EmptyContract && args.length > 1) {
                     this.fail();
@@ -431,15 +443,6 @@ function FunctionContract(label, domain, range) {
             }
         }
     }
-/*
-    this.relax = function(f) {
-        if (typeof f != 'function') { this.fail(); }
-        return function(x) {
-            return range.relax(f(domain.restrict(x)));
-        }
-
-        // TODO: Use above restrict mechanism here too?
-    }*/
 }
 
 FunctionContract.prototype.__proto__ = Contract.prototype;
@@ -622,6 +625,7 @@ function EmptyContract(label) {
     Contract.bind(this)(label);
 
     this.restrict = function(value) {
+        // Functions are called with undefined when no arguments are provided.
         if (value !== undefined) {
             this.fail();
         }
@@ -910,9 +914,9 @@ function buildADT(adtName, input) {
 // Creates data constructors with contracts for the ADT. Also allows for data access
 // and also allows for pattern matching to be performed against the ADT.
 // Input cons is an array of constructors which have a name and a list of params as Strings.
-// eg. a valid inputcons would be 
-// [{name: Empty, params: []}, 
-//  {name: Leaf, params: [{type: Int, name: Leaf}]}, 
+// eg. a valid inputcons would be
+// [{name: Empty, params: []},
+//  {name: Leaf, params: [{type: Int, name: Leaf}]},
 //  {name: Node, params: [{type: BTree, name: left}, {type: BTree, name: right}]}]
 function createADT(adtName, inputCons) {
     var result = {};
@@ -1079,7 +1083,25 @@ if (typeof module !== 'undefined' && module.exports) {
 } else {
     window.Contract = {
         T: T,
-        D: D
+        D: D,
+        Internal: {
+            IntegerContractFactory: IntegerContractFactory,
+            NumberContractFactory: NumberContractFactory,
+            StringContractFactory: StringContractFactory,
+            BooleanContractFactory: BooleanContractFactory,
+            UnitContractFactory: UnitContractFactory,
+            ListContractFactory: ListContractFactory,
+            MapContractFactory: MapContractFactory,
+            ForAllContractFactory: ForAllContractFactory,
+            VariableContractFactory: VariableContractFactory,
+            FunctionContractFactory: FunctionContractFactory,
+            ObjectContractFactory: ObjectContractFactory,
+            MaybeContractFactory: MaybeContractFactory,
+            EmptyContractFactory: EmptyContractFactory,
+            ObjectContractFactoryMerge: ObjectContractFactoryMerge,
+            createTypedef: createTypedef,
+            createADT: createADT
+        }
     }
 }
 }());
