@@ -1,0 +1,8 @@
+-------------
+Known issues and bugs
+-------------
+Issue 1: Can't use lists or maybe types in ADT definitions
+http://code.google.com/p/ristretto-js/issues/detail?id=1
+
+Issue 2: Can't create ADT definitions with more than 2 arguments
+http://code.google.com/p/ristretto-js/issues/detail?id=2
