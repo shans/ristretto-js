@@ -372,7 +372,7 @@ function FunctionContract(label, domain, range) {
                             domain.restrict(args[0]);
                         }
                         return f.apply(null, args2)
-                    }, numArgs - 1
+                    }, numArgs == 0 ? undefined : numArgs - 1
                 );
 
                 // We obviously want to preserve javascript behaviour of allowing multiple arguments
@@ -880,7 +880,7 @@ function D(spec) {
 
 // BuildADT parses the string spec and calls createAdt with the parsed data.
 function buildADT(adtName, input) {
-    input = input.split(/(\||[a-zA-Z0-9]*)/);
+    input = input.split(/ /);
     input = input.filter(function(s) { return s.trim() != '' });
 
     // This function simply parses all the data constructors and returns them
