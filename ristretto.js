@@ -41,10 +41,18 @@ function Contract(label) {
     this.swap = function() { this.label.swap(); }
 }
 
+function getClass(obj) {
+    return Object.prototype.toString.call(obj).slice(8, -1);
+}
+
+function is(type, obj) {
+    return obj !== null && getClass(obj) === type;
+}
+
 function IntegerContract(label) {
     Contract.bind(this)(label);
     this.restrict = function(x) {
-        if (typeof x == 'number' && Math.round(x) == x) {
+        if (is('Number', x) && Math.round(x) == x) {
             return x;
         } else {
             this.fail();
@@ -68,7 +76,7 @@ function IntegerContractFactory() {
 function NumberContract(label) {
     Contract.bind(this)(label);
     this.restrict = function(x) {
-        if (typeof x == 'number') {
+        if (is('Number', x)) {
             return x;
         } else {
             this.fail();
@@ -92,7 +100,7 @@ function NumberContractFactory() {
 function StringContract(label) {
     Contract.bind(this)(label);
     this.restrict = function(x) {
-        if (typeof x == 'string') {
+        if (is('String', x)) {
             return x;
         } else {
             this.fail();
@@ -116,7 +124,7 @@ function StringContractFactory() {
 function BooleanContract(label) {
     Contract.bind(this)(label);
     this.restrict = function(x) {
-        if (typeof x == 'boolean') {
+        if (is('Boolean', x)) {
             return x;
         } else {
             this.fail();
@@ -140,7 +148,7 @@ function BooleanContractFactory() {
 function UnitContract(label) {
     Contract.bind(this)(label);
     this.restrict = function(x) {
-        if (typeof x == 'undefined') {
+        if (is('Undefined', x)) {
             return x;
         } else {
             this.fail();
@@ -291,8 +299,8 @@ function VariableContract(label, lock) {
     this.relax = function(x) {
         // Need to keep a ref count to allow key to be reused
         if (lock.ref == 0) {
-            lock.type = typeof(x);
-        } else if (lock.type != typeof(x)) {
+            lock.type = getClass(x);
+        } else if (lock.type != getClass(x)) {
             lock.ref = 0;
             this.fail();
         }
@@ -339,7 +347,7 @@ function FunctionContract(label, domain, range) {
     // If it is the last argument, then we simply call the function. If numArgs is not
     // specified, the number of arguments is predicted and used.
     this.restrict = function(f, numArgs) {
-        if (typeof f != 'function') { this.fail(); }
+        if (!is('Function', f)) { this.fail(); }
         // Only adds an extra layer if the range is a function, the domain isn't an EmptyContract
         // and if num args is provided that there is more than 1 arg required. If num args isn't provided
         // we simply try to infer the number of arguments.
@@ -403,7 +411,7 @@ function FunctionContract(label, domain, range) {
     }
 
     this.relax = function(f, numArgs) {
-        if (typeof f != 'function') { this.fail(); }
+        if (!is('Function', f)) { this.fail(); }
         if (range.__proto__.constructor == FunctionContract &&
                 domain.__proto__.constructor != EmptyContract &&
                 (numArgs === undefined || numArgs > 1) &&
@@ -462,7 +470,7 @@ function ObjectContract(label, name, fields) {
     this.lock = cryptographicKey++;
 
     this.restrict = function(x) {
-        if (typeof x != 'object') { this.fail(); }
+        if (!is('Object', x)) { this.fail(); }
         if (this.name && x.__proto__.constructor.name != this.name) { this.fail(); }
         var o = new Object();
         for (var i = 0; i < this.fields.length; i++) {
@@ -510,7 +518,7 @@ function ObjectContract(label, name, fields) {
     }
 
     this.relax = function(x) {
-        if (typeof x != 'object') { this.fail(); }
+        if (!is('Object', x)) { this.fail(); }
         if (this.name && x.__proto__.constructor.name != this.name) { this.fail(); }
         if (x.__reference__) {
             var o = x.__reference__(this, this.lock);
@@ -880,7 +888,7 @@ function D(spec) {
 
 // BuildADT parses the string spec and calls createAdt with the parsed data.
 function buildADT(adtName, input) {
-    input = input.split(/ /);
+    input = input.split(/( |(?=\|))/);
     input = input.filter(function(s) { return s.trim() != '' });
 
     // This function simply parses all the data constructors and returns them
@@ -1009,14 +1017,14 @@ function createADT(adtName, inputCons) {
                         for (var j in args) {
                             var a = args[j];
                             // Recursviely check that this is a match.
-                            if (typeof a == "function" && a.match) {
+                            if (is('Function', a) && a.match) {
                                 if (a.match(o[cons.params[j].name]) === false) {
                                     return false;
                                 }
-                            } else if (typeof a == "string" && a[0] != "'") {
+                            } else if (is('String', a) && a[0] != "'") {
                                 // Variable, do nothing for now
                             } else {
-                                if (typeof a == "string" && a[0] == "'") {
+                                if (is('String', a) && a[0] == "'") {
                                     // Literal string value
                                     if (a.substring(1) !== o[cons.params[j].name]) {
                                         return false;
@@ -1035,7 +1043,7 @@ function createADT(adtName, inputCons) {
                     // properties specified by the variables given in the pattern.
                     for (var j in args) {
                         var a = args[j];
-                        if (typeof a == "string" && a != "_" && a[0] != "'") {
+                        if (is('String', a) && a != "_" && a[0] != "'") {
                             if (cons === undefined) {
                                 matcher[a] = o;
                             } else {
