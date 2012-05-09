@@ -997,4 +997,12 @@ $(document).ready(function() {
         strictEqual(depth(BTree.Leaf("asd")), 1, "Valid depth function");
         strictEqual(depth(BTree.Node(BTree.Leaf("asd"), BTree.Leaf("hello"))), 501, "Valid depth function");
     });
+
+    module("Type specification parser");
+
+    test("Un-named type specifications supported", function() {
+        var f = T("Int -> Int", function(a) { return a - 2; });
+        strictEqual(f(4), 2, "Valid anonymous type restricted function");
+        raises(function() { f("foo"); }, "Anonymous type restriction enforced")
+    });
 });

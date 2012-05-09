@@ -38,7 +38,6 @@ function Contract(label) {
     this.relax = null;
     this.label = label;
     this.fail = function() { throw TypeError(this.label.toString()); }
-    this.swap = function() { this.label.swap(); }
 }
 
 function getClass(obj) {
@@ -858,7 +857,15 @@ function T(spec, value) {
 
     var values = spec.split("::");
 
-    var contract = buildContract(values[1].trim())(new Label(values[0].trim()));
+    if (values.length == 2) {
+        name = values[0].trim();
+        type = values[1].trim();
+    } else {
+        name = "anonymous"
+        type = spec.trim();
+    }
+
+    var contract = buildContract(type)(new Label(name));
     return contract.restrict(value);
 }
 
