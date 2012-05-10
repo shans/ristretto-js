@@ -274,6 +274,7 @@ function MapContract(label, keyContract, valueContract) {
 
     this.restrict = function(x) {
         if (!x) { this.fail(); }
+        if (typeof(x) != 'object') { this.fail(); }
         var out = {}
         for (var key in x) {
             out[keyContract.restrict(key)] = valueContract.restrict(x[key]);
@@ -283,6 +284,7 @@ function MapContract(label, keyContract, valueContract) {
 
     this.relax = function(x) {
         if (!x) { this.fail(); }
+        if (typeof(x) != 'object') { this.fail(); }        
         var out = {}
         for (var key in x) {
             out[keyContract.relax(key)] = valueContract.relax(x[key]);
