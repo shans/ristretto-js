@@ -36,8 +36,23 @@ function Label(name) {
 function Contract(label) {
     this.restrict = null;
     this.relax = null;
+    this.repr = function() { return "unknown" };
     this.label = label;
-    this.fail = function() { throw TypeError(this.label.toString()); }
+    this.parent = function(x) { return "{ " + x + " }"; };
+    this.children = [];
+    this.setParent = function(p) { 
+        var oldParent = this.parent;
+        this.parent = function(x) { return p(oldParent(x)); }
+        for (var i = 0; i < this.children.length; i++) {
+            this.children[i].setParent(p);
+        }
+    }
+    this.fail = function(reason) {
+        throw new TypeError(this.label.toString() + ": " + reason + " [ in " + this.parent(this.repr()) + " ]"); 
+    }
+    this.expected = function(value) {
+        return "Expected value of type " + this.repr() + " but given " + repr(value);
+    }
 }
 
 function getClass(obj) {
@@ -48,16 +63,27 @@ function is(type, obj) {
     return obj !== null && getClass(obj) === type;
 }
 
+function repr(value) {
+    if (typeof value == "string") {
+        return '"' + value + '"';
+    }
+    if (typeof value == "function") {
+        return 'a function';
+    }
+    return value;
+}
+
 function IntegerContract(label) {
     Contract.bind(this)(label);
     this.restrict = function(x) {
         if (is('Number', x) && Math.round(x) == x) {
             return x;
         } else {
-            this.fail();
+            this.fail(this.expected(x));
         }
     }
     this.relax = this.restrict;
+    this.repr = function() { return "Int" };
 }
 
 IntegerContract.prototype.__proto__ = Contract.prototype;
@@ -78,10 +104,11 @@ function NumberContract(label) {
         if (is('Number', x)) {
             return x;
         } else {
-            this.fail();
+            this.fail(this.expected(x));
         }
     }
     this.relax = this.restrict;
+    this.repr = function() { return "Num"; }
 }
 
 NumberContract.prototype.__proto__ = Contract.prototype;
@@ -102,10 +129,11 @@ function StringContract(label) {
         if (is('String', x)) {
             return x;
         } else {
-            this.fail();
+            this.fail(this.expected(x));
         }
     }
     this.relax = this.restrict;
+    this.repr = function() { return "String"; }
 }
 
 StringContract.prototype.__proto__ = Contract.prototype;
@@ -171,6 +199,12 @@ function UnitContractFactory() {
 function ListContract(label, itemContract) {
     Contract.bind(this)(label);
     var itemContract = itemContract;
+    this.children = [itemContract];
+    itemContract.setParent(function(x) { return "[" + x + "]"});
+
+    this.repr = function() {
+        return "[" + itemContract.repr() + "]";
+    }
 
     this.restrict = function(x) {
         var out = [];
@@ -227,6 +261,16 @@ function ListContractFactory(itemContractFactory) {
 
 function MapContract(label, keyContract, valueContract) {
     Contract.bind(this)(label);
+
+    console.log(keyContract.repr(), valueContract.repr());
+
+    this.children = [keyContract, valueContract];
+    keyContract.setParent(function(x) { return "<" + x + " : " + valueContract.repr() + ">"});
+    valueContract.setParent(function(x) { return "<" + keyContract.repr() + " : " + x + ">"});
+
+    this.repr = function() { 
+        return "<" + keyContract.repr() + " : " + valueContract.repr() + ">"
+    }
 
     this.restrict = function(x) {
         if (!x) { this.fail(); }
@@ -341,12 +385,19 @@ function FunctionContract(label, domain, range) {
     Contract.bind(this)(label);
     this.domain = domain;
     this.range = range;
+    domain.setParent(function(x) { return x + " -> " + range.repr()});
+    range.setParent(function(x) { return domain.repr() + " -> " + x});
+    this.children = [domain, range];
+
+    this.repr = function() {
+        return domain.repr() + " -> " + range.repr();
+    }
 
     // The parameter numArgs specifies the number of arguments that should be expected.
     // If it is the last argument, then we simply call the function. If numArgs is not
     // specified, the number of arguments is predicted and used.
     this.restrict = function(f, numArgs) {
-        if (!is('Function', f)) { this.fail(); }
+        if (!is('Function', f)) { this.fail(this.expected(f)); }
         // Only adds an extra layer if the range is a function, the domain isn't an EmptyContract
         // and if num args is provided that there is more than 1 arg required. If num args isn't provided
         // we simply try to infer the number of arguments.
@@ -375,6 +426,7 @@ function FunctionContract(label, domain, range) {
                     function() {
                         var args2 = Array.prototype.slice.apply(arguments);
                         args2 = [domain.relax(args[0])].concat(args2);
+
                         if (domain.__proto__.constructor == ObjectContract) {
                             domain.restrict(args[0]);
                         }
@@ -397,7 +449,9 @@ function FunctionContract(label, domain, range) {
                     this.fail();
                 }
                 var restOfArgs = args.slice(1);
-                var result = range.restrict(f(domain.relax(x)));
+                var rDom = domain.relax(x);
+                var out = f(rDom);
+                var result = range.restrict(out);
                 if (domain.__proto__.constructor == ObjectContract) {
                     domain.restrict(x);
                 }
@@ -441,7 +495,7 @@ function FunctionContract(label, domain, range) {
                 if (domain.__proto__.constructor == EmptyContract && args.length > 1) {
                     this.fail();
                 }
-                var restOfArgs = args.slice(1);
+                var restOfArgs = args.slice(1);            
                 var result = range.relax(f(domain.restrict(x)));
                 if (restOfArgs.length == 0) {
                     return result;
@@ -1119,4 +1173,5 @@ if (typeof module !== 'undefined' && module.exports) {
         }
     }
 }
+
 }());
