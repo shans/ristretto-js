@@ -150,11 +150,14 @@ function StringContractFactory() {
 
 function BooleanContract(label) {
     Contract.bind(this)(label);
+
+    this.repr = function() { return "Bool"; }
+
     this.restrict = function(x) {
         if (is('Boolean', x)) {
             return x;
         } else {
-            this.fail();
+            this.fail(this.expected(x));
         }
     }
     this.relax = this.restrict;
@@ -174,11 +177,14 @@ function BooleanContractFactory() {
 
 function UnitContract(label) {
     Contract.bind(this)(label);
+
+    this.repr = function() { return "Unit"; }
+
     this.restrict = function(x) {
         if (is('Undefined', x)) {
             return x;
         } else {
-            this.fail();
+            this.fail(this.expected(x));
         }
     }
     this.relax = this.restrict;
@@ -209,7 +215,7 @@ function ListContract(label, itemContract) {
     this.restrict = function(x) {
         var out = [];
         if (!x || x.length === undefined) {
-            this.fail();
+            this.fail(this.expected(x));
         }
         for (var i = 0; i < x.length; i++) {
             out.push(itemContract.restrict(x[i]));
@@ -237,7 +243,7 @@ function ListContract(label, itemContract) {
     this.relax = function(x) {
         var out = [];
         if (!x || x.length === undefined) {
-            this.fail();
+            this.fail(this.expected(x));
         }
         for (var i = 0; i < x.length; i++) {
             out.push(itemContract.relax(x[i]));
@@ -273,8 +279,8 @@ function MapContract(label, keyContract, valueContract) {
     }
 
     this.restrict = function(x) {
-        if (!x) { this.fail(); }
-        if (typeof(x) != 'object') { this.fail(); }
+        if (!x) { this.fail(this.expected(x)); }
+        if (typeof(x) != 'object') { this.fail(this.expected(x)); }
         var out = {}
         for (var key in x) {
             out[keyContract.restrict(key)] = valueContract.restrict(x[key]);
@@ -283,8 +289,8 @@ function MapContract(label, keyContract, valueContract) {
     }
 
     this.relax = function(x) {
-        if (!x) { this.fail(); }
-        if (typeof(x) != 'object') { this.fail(); }        
+        if (!x) { this.fail(this.expected(x)); }
+        if (typeof(x) != 'object') { this.fail(this.expected(x)); }        
         var out = {}
         for (var key in x) {
             out[keyContract.relax(key)] = valueContract.relax(x[key]);
@@ -306,18 +312,43 @@ function MapContractFactory(keyContractFactory, valueContractFactory) {
 }
 
 var cryptographicKey = 0;
+var nextVarNum = 0;
 
 function ForAllContract(label, body) {
     Contract.bind(this)(label);
 
+    this.generateRepr = function(contract, varNum) {
+        this.repr = function() {
+            return "forall a . " + contract.repr();
+        }
+        this.children = [contract];
+        contract.setParent(function(a) { return "forall a" + varNum + " . " + a});
+    }
+
     this.restrict = function(x) {
-        var lock = {key: cryptographicKey++, type: null, ref: 0};
-        return body(lock)(label).restrict(x);
+        var varNum = nextVarNum;
+        var lock = {key: cryptographicKey++, type: null, ref: 0, varNum: nextVarNum++};
+        var contract = body(lock)(label);
+        var result = contract.restrict(x);
+        // It's important to generate the representation *before* 
+        // returning, otherwise the order of setParent calls is
+        // reversed for ForAllContracts and error messages don't
+        // format correctly.
+        this.generateRepr(contract, varNum);
+        return result;
     }
 
     this.relax = function(x) {
-        var lock = {key: cryptographicKey++, type: null, ref: 0};
-        return body(lock)(label).relax(x);
+        var varNum = nextVarNum;
+        var lock = {key: cryptographicKey++, type: null, ref: 0, varNum: nextVarNum++};
+        var contract = body(lock)(label);
+        var result = contract.relax(x);
+        // It's important to generate the representation *before* 
+        // returning, otherwise the order of setParent calls is
+        // reversed for ForAllContracts and error messages don't
+        // format correctly.
+        this.generateRepr(contract, oldkey, varNum);
+        return result;
     }
 }
 
@@ -340,6 +371,10 @@ function Seal(lock, value) {
 
 function VariableContract(label, lock) {
     Contract.bind(this)(label);
+
+    this.repr = function() {
+        return "a" + lock.varNum;
+    }
 
     this.relax = function(x) {
         // Need to keep a ref count to allow key to be reused
@@ -387,8 +422,13 @@ function FunctionContract(label, domain, range) {
     Contract.bind(this)(label);
     this.domain = domain;
     this.range = range;
-    domain.setParent(function(x) { return x + " -> " + range.repr()});
-    range.setParent(function(x) { return domain.repr() + " -> " + x});
+    if (domain.constructor.name == "FunctionContract") {
+        domain.setParent(function(x) { return "(" + x + ") -> " + range.repr()});
+        range.setParent(function(x) { return "(" + domain.repr() + ") -> " + x});
+    } else {
+        domain.setParent(function(x) { return x + " -> " + range.repr()});
+        range.setParent(function(x) { return domain.repr() + " -> " + x});
+    }
     this.children = [domain, range];
 
     this.repr = function() {
@@ -520,17 +560,45 @@ function FunctionContractFactory(domainFactory, rangeFactory, isRet) {
 
 function ObjectContract(label, name, fields) {
     Contract.bind(this)(label);
-    this.fields = fields;
+    // TODO: why haven't the fields already had the label applied by this point?
+    // Other container contracts like FunctionContract recieve children that
+    // have already had the label applied.
+    this.fields = fields.map(function(a) { return {name: a.name, contract: a.contract(label)}; });
     this.name = name;
     this.lock = cryptographicKey++;
 
+    this.children = this.fields;
+
+    this.setParent = function(x) { return x; }
+
+    function fieldToRepr(field) {
+        return field.name + ": " + field.contract.repr();
+    }
+
+    this.repr = function() {
+        return "{ " + this.fields.map(fieldToRepr).join(" , ") + " }";
+    }
+
+    this.childRepr = function(before, after, name, x) {
+        var newlist = before.map(fieldToRepr);
+        newlist.push(name + ": " + x);
+        newlist = newlist.concat(after.map(fieldToRepr));
+        return "{ " + newlist.join(" , ") + " }"
+    }
+
+    this.fields.forEach(function(val, pos, array) {
+        val.contract.setParent(function(x) {
+            return this.childRepr(array.slice(0, pos), array.slice(pos + 1), val.name, x);
+        }.bind(this));
+    }.bind(this))
+
     this.restrict = function(x) {
-        if (!is('Object', x)) { this.fail(); }
+        if (!is('Object', x)) { this.fail(this.expected(x)); }
         if (this.name && x.__proto__.constructor.name != this.name) { this.fail(); }
         var o = new Object();
         for (var i = 0; i < this.fields.length; i++) {
             var fieldName = this.fields[i].name;
-            var contract = this.fields[i].contract(label);
+            var contract = this.fields[i].contract;
             var infield = x[fieldName];
 
             if (infield != null && infield.bind) {
@@ -579,7 +647,7 @@ function ObjectContract(label, name, fields) {
             var o = x.__reference__(this, this.lock);
             for (var i = 0; i < this.fields.length; i++) {
                 var fieldName = this.fields[i].name;
-                var contract = this.fields[i].contract(label);
+                var contract = this.fields[i].contract;
                 var infield = o[fieldName];
 
                 if (infield != null && infield.bind) {
@@ -606,7 +674,7 @@ function ObjectContract(label, name, fields) {
             var o = new Object();
             for (var i = 0; i < this.fields.length; i++) {
                 var fieldName = this.fields[i].name;
-                var contract = this.fields[i].contract(label);
+                var contract = this.fields[i].contract;
                 var infield = x[fieldName];
 
                 if (infield != null && infield.bind) {
@@ -658,6 +726,15 @@ function ObjectContractFactoryMerge(a, b) {
 function MaybeContract(label, inner) {
     Contract.bind(this)(label);
 
+    if (inner.constructor.name == "FunctionContract") {
+        this.repr = function() { return "(" + inner.repr() + ")?"};
+        inner.setParent(function(x) { return "(" + x + ")?"})
+    } else {
+        this.repr = function() { return inner.repr() + "?" }
+        inner.setParent(function(x) { return x + "?"})
+    }
+    this.children = [inner];
+
     this.restrict = function(value) {
         // Supports both undefined and null. ie. null == null and undefined == null.
         if (value == null) {
@@ -686,11 +763,12 @@ function MaybeContractFactory(innerFactory) {
 
 function EmptyContract(label) {
     Contract.bind(this)(label);
+    this.repr = function() { return "0"; };
 
     this.restrict = function(value) {
         // Functions are called with undefined when no arguments are provided.
         if (value !== undefined) {
-            this.fail();
+            this.fail("Did not expect a value but was given " + repr(value));
         }
     }
 
@@ -710,6 +788,15 @@ function EmptyContractFactory() {
 function ADTContract(label, adtName, contracts) {
     Contract.bind(this)(label);
     var stringContract = StringContractFactory()(label);
+
+    this.repr = function() {
+        var result = adtName + " = ";
+        for (var c in contracts) {
+            result +=  c + " : " + contracts[c].repr + " | "
+        }
+        result = result.substring(0, result.length - 3);
+        return result;
+    }
 
     this.restrict = function(value) {
         stringContract.restrict(value.type);
