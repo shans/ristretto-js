@@ -39,6 +39,15 @@ $(document).ready(function() {
         return "string" + input;
     }
 
+    function raisesError(f, name) {
+        try {
+            f();
+        } catch (e) {
+            console.log(e, e.message, {err: e.stack});
+        }
+        raises(f, name);
+    }
+
     test("Int -> Int functions", function() {
         var sumR = T("sum :: Int -> Int", sum)
         var noIntOutputR = T("noIntOutput :: Int -> Int", noIntOutput);
@@ -47,13 +56,13 @@ $(document).ready(function() {
         strictEqual(sum("10"), "010101010101010101010", "Valid function");
 
         strictEqual(sumR(10), 100, "Valid function with contract");
-        raises(function() { sumR("10"); }, "Valid function with contract");
+        raisesError(function() { sumR("10"); }, "Valid function with contract");
 
         strictEqual(noIntOutput(10), "string10", "Invalid function");
         strictEqual(noIntOutput("10"), "string10", "Invalid function");
 
-        raises(function() { noIntOutputR(10); }, "Invalid function with contract");
-        raises(function() { noIntOutputR("10"); }, "Invalid function with contract");
+        raisesError(function() { noIntOutputR(10); }, "Invalid function with contract");
+        raisesError(function() { noIntOutputR("10"); }, "Invalid function with contract");
     });
 
     test("Num -> Num functions", function() {
@@ -65,16 +74,16 @@ $(document).ready(function() {
         strictEqual(sum(1), 1, "Valid function");
 
         strictEqual(sumR(10.11), 10.11*11, "Valid function with contract");
-        raises(function() { sumR("5"); }, "Valid function with contract");
+        raisesError(function() { sumR("5"); }, "Valid function with contract");
         strictEqual(sumR(1), 1, "Valid function with contract");
 
         strictEqual(noIntOutput(10.123), "string10.123", "Invalid function");
         strictEqual(noIntOutput("5"), "string5", "Invalid function");
         strictEqual(noIntOutput(1), "string1", "Invalid function");
 
-        raises(function() { noIntOutputR(10.1234); }, "Invalid function with contract");
-        raises(function() { noIntOutputR("5"); }, "Invalid function with contract");
-        raises(function() { noIntOutputR(1); }, "Invalid function with contract");
+        raisesError(function() { noIntOutputR(10.1234); }, "Invalid function with contract");
+        raisesError(function() { noIntOutputR("5"); }, "Invalid function with contract");
+        raisesError(function() { noIntOutputR(1); }, "Invalid function with contract");
     });
 
     test("String -> String functions", function() {
@@ -88,13 +97,13 @@ $(document).ready(function() {
         strictEqual(sum(5), 25, "Valid function");
         strictEqual(sum("5"), "055555", "Valid function");
 
-        raises(function() { sumR(99); }, "Valid function with contract");
-        raises(function() { sumR("Hello world"); }, "Valid function with contract");
+        raisesError(function() { sumR(99); }, "Valid function with contract");
+        raisesError(function() { sumR("Hello world"); }, "Valid function with contract");
         strictEqual(sumR("10"), "010101010101010101010", "Valid function with contract");
 
         strictEqual(length("How long is this?"), 17, "Invalid function");
 
-        raises(function() { lengthR("How long is this?"); }, "Invalid function with contract");
+        raisesError(function() { lengthR("How long is this?"); }, "Invalid function with contract");
     });
 
     test("Bool -> Bool functions", function() {
@@ -114,16 +123,16 @@ $(document).ready(function() {
         strictEqual(not(5), false, "Valid function");
 
         strictEqual(notR(true), false, "Valid function with contract");
-        raises(function() { notR("5"); }, "Valid function with contract");
-        raises(function() { notR(5); }, "Valid function with contract");
+        raisesError(function() { notR("5"); }, "Valid function with contract");
+        raisesError(function() { notR(5); }, "Valid function with contract");
 
         strictEqual(notExpected(true), "not", "Invalid function");
         strictEqual(notExpected("5"), "not", "Invalid function");
         strictEqual(notExpected(5), "not", "Invalid function");
 
-        raises(function() { notExpectedR(true); }, "Invalid function with contract");
-        raises(function() { notExpectedR("5"); }, "Invalid function with contract");
-        raises(function() { notExpectedR(5); }, "Invalid function with contract");
+        raisesError(function() { notExpectedR(true); }, "Invalid function with contract");
+        raisesError(function() { notExpectedR("5"); }, "Invalid function with contract");
+        raisesError(function() { notExpectedR(5); }, "Invalid function with contract");
     });
 
     test("Unit functions", function() {
@@ -137,7 +146,7 @@ $(document).ready(function() {
 
         setValueR(5);
         strictEqual(x, 5, "Setting a value to a variable");
-        raises(function() { setValueR("String"); }, "Setting an invalid value");
+        raisesError(function() { setValueR("String"); }, "Setting an invalid value");
 
         function badSetValue(val) {
             x = val;
@@ -146,9 +155,9 @@ $(document).ready(function() {
 
         var badSetValueR = T("badSetValue :: Int -> Unit", badSetValue);
 
-        raises(function() { badSetValueR(0); }, "Invalid function");
-        raises(function() { badSetValueR("String"); }, "Invalid function");
-        raises(function() { badSetValueR("undefined"); }, "Invalid function");
+        raisesError(function() { badSetValueR(0); }, "Invalid function");
+        raisesError(function() { badSetValueR("String"); }, "Invalid function");
+        raisesError(function() { badSetValueR("undefined"); }, "Invalid function");
     });
 
     module("Polymorphic tests");
@@ -173,14 +182,14 @@ $(document).ready(function() {
         strictEqual(badId(4), "44", "Violates contract by using input");
         strictEqual(badId("some string"), "some string4", "Violates contract by using input");
 
-        raises(function() { badIdR(4); }, "Violates contract by using input, contract applied");
-        raises(function() { badIdR("some string"); }, "Violates contract by using input, contract applied");
+        raisesError(function() { badIdR(4); }, "Violates contract by using input, contract applied");
+        raisesError(function() { badIdR("some string"); }, "Violates contract by using input, contract applied");
 
         strictEqual(badId2(4), "not your input", "Violates contract by replacing input");
         strictEqual(badId2("some string"), "not your input", "Violates contract by replacing input");
 
-        raises(function() { badIdR2(4); }, "Violates contract by replacing input, contract applied");
-        raises(function() { badIdR2("some string"); }, "Violates contract by replacing input, contract applied");
+        raisesError(function() { badIdR2(4); }, "Violates contract by replacing input, contract applied");
+        raisesError(function() { badIdR2("some string"); }, "Violates contract by replacing input, contract applied");
     });
 
     module("Box tests");
@@ -201,8 +210,8 @@ $(document).ready(function() {
         deepEqual(badBox(8), {field2: 8}, "Invalid box");
         deepEqual(badBox("ball"), {field2: "ball"}, "Invalid box");
 
-        raises(function() { badBoxR(8); }, "Invalid box with contract");
-        raises(function() { badBoxR("ball"); }, "Invalid box with contract");
+        raisesError(function() { badBoxR(8); }, "Invalid box with contract");
+        raisesError(function() { badBoxR("ball"); }, "Invalid box with contract");
     });
 
     module("Object tests");
@@ -237,14 +246,14 @@ $(document).ready(function() {
         strictEqual(processObject(new badObject()), "foo", "Invalid object");
 
         strictEqual(processObjectR(new TestObject()), 10, "Valid object with contract");
-        raises(function() { processObjectR(new Object()); }, "Invalid empty object with contract");
+        raisesError(function() { processObjectR(new Object()); }, "Invalid empty object with contract");
         strictEqual(processObjectR(new anotherTestObject()), 7, "Valid object with contract");
-        raises(function() { processObjectR(new badObject()); }, "Invalid object with contract");
+        raisesError(function() { processObjectR(new badObject()); }, "Invalid object with contract");
 
         strictEqual(processObjectRb(new TestObject()), 10, "Valid object with contract using @TestObject");
-        raises(function() { processObjectRb(new Object()); }, "Invalid empty object with contract using @TestObject");
-        raises(function() { processObjectRb(new anotherTestObject()); }, "Valid object with contract using @TestObject");
-        raises(function() { processObjectRb(new badObject()); }, "Invalid object with contract @TestObject");
+        raisesError(function() { processObjectRb(new Object()); }, "Invalid empty object with contract using @TestObject");
+        raisesError(function() { processObjectRb(new anotherTestObject()); }, "Valid object with contract using @TestObject");
+        raisesError(function() { processObjectRb(new badObject()); }, "Invalid object with contract @TestObject");
     });
 
     test("Passing between multiple functions", function() {
@@ -263,7 +272,7 @@ $(document).ready(function() {
         var chillR = T("chill :: {age: Int, gender: String} -> Int", chill);
 
         strictEqual(chillR(sam), 15, "Valid object")
-        raises(function() { chillR({age: "young", gender: "not sure"}); }, "Invalid object");
+        raisesError(function() { chillR({age: "young", gender: "not sure"}); }, "Invalid object");
 
         function noBoundary(p) {
             p.age = "old";
@@ -272,8 +281,8 @@ $(document).ready(function() {
 
         var joe = getPersonR(30);
 
-        raises(function() { noBoundary(joe); }, "Function trying to modify protected object");
-        raises(function() { noBoundary(sam); }, "Function modifying unprotected object");
+        raisesError(function() { noBoundary(joe); }, "Function trying to modify protected object");
+        raisesError(function() { noBoundary(sam); }, "Function modifying unprotected object");
     });
 
     test("Manipulating objects", function() {
@@ -302,7 +311,7 @@ $(document).ready(function() {
 
         var badManipulateR = T("badManipulate :: {a: Int, b: Int -> Int} -> Int", badManipulate);
 
-        raises(function() { badManipulateR(myObject); }, "Manipulating an object incorrectly");
+        raisesError(function() { badManipulateR(myObject); }, "Manipulating an object incorrectly");
     });
 
     module("Map tests");
@@ -342,17 +351,17 @@ $(document).ready(function() {
         deepEqual(badMap([1,2], increment), [2,2], "Bad map");
         deepEqual(badMap([1], increment), [2], "Bad map");
 
-        raises(function () { badMapR([1,2,3], increment); }, "Bad map with contract");
-        raises(function () { badMapR([1,2], increment); }, "Bad map with contract");
+        raisesError(function () { badMapR([1,2,3], increment); }, "Bad map with contract");
+        raisesError(function () { badMapR([1,2], increment); }, "Bad map with contract");
         deepEqual(badMapR([1], increment), [2], "Bad map with contract");
 
         deepEqual(sneakyMap([1,2,3], increment), [3,3,4], "Sneaky map");
         deepEqual(sneakyMap([1,2], increment), [3,3], "Sneaky map");
         deepEqual(sneakyMap([1], increment), [3], "Sneaky  map");
 
-        raises(function () { sneakyMapR([1,2,3], increment); }, "Bad map with contract");
-        raises(function () { sneakyMapR([1,2], increment); }, "Bad map with contract");
-        raises(function () { sneakyMapR([1], increment); }, "Bad map with contract");
+        raisesError(function () { sneakyMapR([1,2,3], increment); }, "Bad map with contract");
+        raisesError(function () { sneakyMapR([1,2], increment); }, "Bad map with contract");
+        raisesError(function () { sneakyMapR([1], increment); }, "Bad map with contract");
     });
 
     test("Multiple input functions", function() {
@@ -408,16 +417,16 @@ $(document).ready(function() {
         deepEqual(append([1,2,"sneaky"], 1), [1,2,"sneaky",1], "Appending to a list");
 
         deepEqual(appendR([1,2,3], 1), [1,2,3,1], "Appending to a list with contract");
-        raises(function() { appendR([1,2,3], "hello"); }, "Appending to a list with contract");
-        raises(function() { appendR([1,2,"sneaky"], 1); }, "Appending to a list with contract");
+        raisesError(function() { appendR([1,2,3], "hello"); }, "Appending to a list with contract");
+        raisesError(function() { appendR([1,2,"sneaky"], 1); }, "Appending to a list with contract");
 
         deepEqual(badAppend([1,2,3], 1), [1,2,3,1], "Bad appending to a list");
         deepEqual(badAppend([1,2,3], "hello"), [1,2,3,1], "Bad appending to a list");
         deepEqual(badAppend([1,2,"sneaky"], 1), [1,2,"sneaky",1], "Bad appending to a list");
 
-        raises(function() { badAppendR([1,2,3], 1); }, "Bad appending to a list with contract");
-        raises(function() { badAppendR([1,2,3], "hello"); }, "Bad appending to a list with contract");
-        raises(function() { badAppendR([1,2,"sneaky"], 1); }, "Bad appending to a list with contract");
+        raisesError(function() { badAppendR([1,2,3], 1); }, "Bad appending to a list with contract");
+        raisesError(function() { badAppendR([1,2,3], "hello"); }, "Bad appending to a list with contract");
+        raisesError(function() { badAppendR([1,2,"sneaky"], 1); }, "Bad appending to a list with contract");
 
         function getList(item) {
             return [item];
@@ -430,7 +439,7 @@ $(document).ready(function() {
         var result = getListR(0);
         result.push(1);
         deepEqual(result, [0, 1], "Valid append to a list with contract");
-        raises(function() { getListR(0).push("asdf"); }, "Invalid append to list with contract");
+        raisesError(function() { getListR(0).push("asdf"); }, "Invalid append to list with contract");
     });
 
     module("Dictionary tests");
@@ -455,17 +464,17 @@ $(document).ready(function() {
 
         strictEqual(lookupR("3", {3: "foo"}), "foo", "Valid lookup with contract");
         strictEqual(lookupR("3", {3: 4}), 4, "Valid lookup with contract");
-        raises(function() { lookupR("3", {3: "foo", 4: 5}); }, "Mixed dictionary with contract");
+        raisesError(function() { lookupR("3", {3: "foo", 4: 5}); }, "Mixed dictionary with contract");
 
         strictEqual(badLookup("3", {3: "foo"}), 3, "Valid lookup");
         strictEqual(badLookup("3", {3: 4}), 3, "Valid lookup");
         strictEqual(badLookup("foo", {3: "foo"}), 3, "No matching entry");
         strictEqual(badLookup("3", {3: "foo", 4: 5}), 3, "Mixed dictionary");
 
-        raises(function() { badLookupR("3", {3: "foo"}); }, "Bad lookup  with contract");
-        raises(function() { badLookupR("3", {3: 4}); }, "Bad lookup with contract");
-        raises(function() { badLookupR("foo", {3: "foo"}); }, "Bad lookup with contract");
-        raises(function() { badLookupR("3", {3: "foo", 4: 5}); }, "Bad lookup with contract");
+        raisesError(function() { badLookupR("3", {3: "foo"}); }, "Bad lookup  with contract");
+        raisesError(function() { badLookupR("3", {3: 4}); }, "Bad lookup with contract");
+        raisesError(function() { badLookupR("foo", {3: "foo"}); }, "Bad lookup with contract");
+        raisesError(function() { badLookupR("3", {3: "foo", 4: 5}); }, "Bad lookup with contract");
     });
 
     module("Typedef tests");
@@ -481,18 +490,18 @@ $(document).ready(function() {
         var getAgeR2 = T("getAge :: Male -> Int", getAge);
 
         strictEqual(getAgeR({age: 15, name: "Joe"}), 15, "Valid person");
-        raises(function() { getAgeR({age: "fifteen", name: "Joe"}); }, "Invalid person");
-        raises(function() { getAgeR({age: 15, name: 15}); }, "Invalid person");
+        raisesError(function() { getAgeR({age: "fifteen", name: "Joe"}); }, "Invalid person");
+        raisesError(function() { getAgeR({age: 15, name: 15}); }, "Invalid person");
         strictEqual(getAgeR({age: 15, name: "Joe", gender: "M"}), 15, "Valid person, adding attributes");
 
         strictEqual(getAgeR2({age: 15, name: "Joe"}), 15, "Valid person, ref another typedef");
-        raises(function() { getAgeR2({age: "fifteen", name: "Joe"}); }, "Invalid person, ref another typedef");
-        raises(function() { getAgeR2({age: 15, name: 15}); }, "Invalid person, ref another typedef");
+        raisesError(function() { getAgeR2({age: "fifteen", name: "Joe"}); }, "Invalid person, ref another typedef");
+        raisesError(function() { getAgeR2({age: 15, name: 15}); }, "Invalid person, ref another typedef");
         strictEqual(getAgeR2({age: 15, name: "Joe", gender: "M"}), 15, "Valid person, adding attributes, ref another typedef");
 
-        raises(function() { T("typedef Int :: NotInt"); }, "Invalid typedef using reserved keywords");
-        raises(function() { T("typedef String :: NotString"); }, "Invalid typedef using reserved keywords");
-        raises(function() { T("typedef Bool :: NotBool"); }, "Invalid typedef using reserved keywords");
+        raisesError(function() { T("typedef Int :: NotInt"); }, "Invalid typedef using reserved keywords");
+        raisesError(function() { T("typedef String :: NotString"); }, "Invalid typedef using reserved keywords");
+        raisesError(function() { T("typedef Bool :: NotBool"); }, "Invalid typedef using reserved keywords");
 
     });
 
@@ -535,8 +544,8 @@ $(document).ready(function() {
         strictEqual(parseR(new reader()), true, "Valid reader");
         strictEqual(parseR2(new fileReader()), true, "Valid file reader");
         strictEqual(parseR(new fileReader()), true, "Valid file reader");
-        raises(function() { parseR2(new reader()); }, "Invalid reader passed in");
-        raises(function() { parseR2(new badFileReader()); }, "Bad file reader passesd in");
+        raisesError(function() { parseR2(new reader()); }, "Invalid reader passed in");
+        raisesError(function() { parseR2(new badFileReader()); }, "Bad file reader passesd in");
 
         T("typedef Buffered :: {buffered: Bool}");
         T("typedef Valid :: {valid: Bool}");
@@ -575,8 +584,8 @@ $(document).ready(function() {
         strictEqual(parseR3(new validBufferedFileReader()), true, "Valid reader");
         strictEqual(parseR4(new validBufferedFileReader()), true, "Valid reader");
 
-        raises(function() { parseR3(new invalidBufferedFileReader()); }, "Invalid reader passed in");
-        raises(function() { parseR4(new invalidBufferedFileReader()); }, "Invalid reader passed in");
+        raisesError(function() { parseR3(new invalidBufferedFileReader()); }, "Invalid reader passed in");
+        raisesError(function() { parseR4(new invalidBufferedFileReader()); }, "Invalid reader passed in");
     });
 
     module("Maybe tests");
@@ -588,7 +597,7 @@ $(document).ready(function() {
 
         var nullableR = T("nullable :: Int -> Int", nullable);
 
-        raises(function() { nullableR(5); }, "Non-nullable result allowed");
+        raisesError(function() { nullableR(5); }, "Non-nullable result allowed");
 
         var nullableR2 = T("nullable :: Int -> Int?", nullable);
 
@@ -615,8 +624,8 @@ $(document).ready(function() {
         var lookupR = T("lookup :: forall b. String -> <b> -> b?", lookup);
 
         strictEqual(lookupR("foo", {bar: "hello"}), undefined, "Return null since not found");
-        raises(function() { lookupR("bar", {bar: "hello", foo: null}); } , "Null dictionary unallowed");
-        raises(function() { lookupR("bar", {bar: "hello", foo: undefined}); } , "Null dictionary unallowed");
+        raisesError(function() { lookupR("bar", {bar: "hello", foo: null}); } , "Null dictionary unallowed");
+        raisesError(function() { lookupR("bar", {bar: "hello", foo: undefined}); } , "Null dictionary unallowed");
     });
 
     test("Mixing the maybe type with other contracts", function() {
@@ -628,8 +637,8 @@ $(document).ready(function() {
         var applyR = T("apply :: (Int -> Int)? -> Int -> Int", apply);
 
         strictEqual(applyR(function increment (num) { return ++num; }, 9), 10, "Maybe function");
-        raises(function() { applyR(null, 9); }, "Maybe function");
-        raises(function() { applyR(undefined, 9); }, "Maybe function");
+        raisesError(function() { applyR(null, 9); }, "Maybe function");
+        raisesError(function() { applyR(undefined, 9); }, "Maybe function");
 
         var applyR2 = T("apply :: (Int -> Int)? -> Int -> Int?", apply);
 
@@ -651,9 +660,9 @@ $(document).ready(function() {
         deepEqual(appendR([1,2,3], 4), [1,2,3,4], "[a?] Valid append");
         deepEqual(appendR([0,0,0], 0), [0,0,0,0], "[a?] Valid append");
         deepEqual(appendR([1,null,3], 4), [1,null,3,4], "[a?] Lists with nulls");
-        raises(function() { appendR(null, 4); }, "[a?] Invalid list");
+        raisesError(function() { appendR(null, 4); }, "[a?] Invalid list");
 
-        raises(function() {
+        raisesError(function() {
             var appendR2 = T("append :: forall a?. [a] -> a -> [a]", append);
         }, "forall a?. Invalid use of maybe");
 
@@ -661,7 +670,7 @@ $(document).ready(function() {
 
         deepEqual(appendR3([1,2,3], 4), [1,2,3,4], "[a]? Valid append");
         deepEqual(appendR3([0], 0), [0,0], "[a]? Valid append");
-        raises(function() { appendR3([1,null,3], 4); }, "[a]? Invalid list with nulls");
+        raisesError(function() { appendR3([1,null,3], 4); }, "[a]? Invalid list with nulls");
         deepEqual(appendR3(null, 4), [4], "[a]? Null list");
 
         // Maps
@@ -674,11 +683,11 @@ $(document).ready(function() {
         strictEqual(lookupR("water", {water: "liquid"}), "liquid", "<b>? Valid lookup");
         strictEqual(lookupR("", {water: "liquid"}), undefined, "<b>? Valid lookup");
         strictEqual(lookupR("water", null), null, "<b>? Valid lookup with null map");
-        raises(function() { lookupR(null, {water: "liquid"}); }, "<b>? Invalid lookup");
-        raises(function() { lookupR(water, {water: "liquid", steam: null}); }, "<b>? Invalid lookup");
+        raisesError(function() { lookupR(null, {water: "liquid"}); }, "<b>? Invalid lookup");
+        raisesError(function() { lookupR(water, {water: "liquid", steam: null}); }, "<b>? Invalid lookup");
         strictEqual(lookupR("water", undefined), null, "<b>? Valid lookup with null map");
-        raises(function() { lookupR(undefined, {water: "liquid"}); }, "<b>? Invalid lookup");
-        raises(function() { lookupR(water, {water: "liquid", steam: undefined}); }, "<b>? Invalid lookup");
+        raisesError(function() { lookupR(undefined, {water: "liquid"}); }, "<b>? Invalid lookup");
+        raisesError(function() { lookupR(water, {water: "liquid", steam: undefined}); }, "<b>? Invalid lookup");
 
         // Objects
         function getName(person) {
@@ -691,15 +700,15 @@ $(document).ready(function() {
         strictEqual(getNameR(null), null, "{...}? Valid null object");
         strictEqual(getNameR(undefined), null, "{...}? Valid null object");
         strictEqual(getNameR({name: "", age: 0}), "", "{...}? Valid object");
-        raises(function() { getNameR({name: "Sam"}); }, "{...}? Invalid object");
+        raisesError(function() { getNameR({name: "Sam"}); }, "{...}? Invalid object");
 
         var getNameR2 = T("getName :: {name: String, age: Int?} -> String", getName);
 
         strictEqual(getNameR2({name: "Sam", age: 15}), "Sam", "{..?} Valid object");
-        raises(function() { getNameR2(null); }, "{..?} Invalid null object");
-        raises(function() { getNameR2(undefined); }, "{..?} Invalid null object");
+        raisesError(function() { getNameR2(null); }, "{..?} Invalid null object");
+        raisesError(function() { getNameR2(undefined); }, "{..?} Invalid null object");
         strictEqual(getNameR({name: "", age: 0}), "", "{...}? Valid object");
-        strictEqual(getNameR2({name: "Sam", age: null}), "Sam", "{..?} Invalid object");
+        strictEqual(getNameR2({name: "Sam", age: undefined}), "Sam", "{..?} Invalid object");
         strictEqual(getNameR2({name: "Sam", age: undefined}), "Sam", "{..?} Invalid object");
 
         function createPerson(name) {
@@ -729,8 +738,8 @@ $(document).ready(function() {
         var applyR = T("apply :: (String -> Int) -> String -> Int", apply);
 
         strictEqual(applyR(lenR, "Hello world"), 11, "Valid parameters");
-        raises(function() { applyR(lenR, "Hello"); }, "Invalid parameters");
-        raises(function() { applyR(lenR, ""); }, "Invalid parameters");
+        raisesError(function() { applyR(lenR, "Hello"); }, "Invalid parameters");
+        raisesError(function() { applyR(lenR, ""); }, "Invalid parameters");
     });
 
     module("Function tests");
@@ -751,7 +760,7 @@ $(document).ready(function() {
 
         strictEqual(idR(getFnR(5))("Hello"), 5, "Valid chaining of functions");
         strictEqual(idR(getFnR(5), "Hello"), 5, "Valid chaining of functions");
-        raises(function() { idR(getFnR, 5, "Hello"); }, "Invalid chaining of functions");
+        raisesError(function() { idR(getFnR, 5, "Hello"); }, "Invalid chaining of functions");
 
         var idR = T("id :: (Int -> (String -> Int)) -> (Int -> (String -> Int))", id);
 
@@ -777,12 +786,12 @@ $(document).ready(function() {
         }
 
         var getSizeR = T("getSize :: 0 -> Int", getSize);
-        raises(function () { T("getSize :: 0", getSize); }, "Invalid use of no params");
-        raises(function () { T("getSize :: Int -> 0", getSize); }, "Invalid use of no params");
+        raisesError(function () { T("getSize :: 0", getSize); }, "Invalid use of no params");
+        raisesError(function () { T("getSize :: Int -> 0", getSize); }, "Invalid use of no params");
 
         strictEqual(getSizeR(), 5000, "No parameters passed");
-        raises(function () { getSizeR(500); }, "Calling empty function with params");
-        raises(function () { getSizeR(undefined, 500, 500); }, "Calling empty function with params");
+        raisesError(function () { getSizeR(500); }, "Calling empty function with params");
+        raisesError(function () { getSizeR(undefined, 500, 500); }, "Calling empty function with params");
 
         function pointless(num, fn) {
             return fn();
@@ -797,7 +806,7 @@ $(document).ready(function() {
         }
 
         var addR = T("add :: Int -> (0 -> Int) -> (0 -> Int)", add);
-        raises(function () { T("add :: Int -> (0 -> Int) -> 0", add); }, "Invalid use of no params");
+        raisesError(function () { T("add :: Int -> (0 -> Int) -> 0", add); }, "Invalid use of no params");
 
         strictEqual(addR(1000, getSize)(), 6000, "Valid chain of functions, explicit brackets");
 
@@ -884,9 +893,9 @@ $(document).ready(function() {
 
         strictEqual(doNothingR(tree), true, "Valid tree");
         strictEqual(doNothingR(BTree.Node(tree, BTree.Leaf(4))), true, "Valid tree");
-        raises(function () { doNothingR(BTree.Node(BTree.Empty(), 4)); }, "Invalid tree");
-        raises(function () { doNothingR(4); }, "Invalid tree");
-        raises(function () { doNothingR(BTree.Node(BTree.Empty(), BTree.Leaf("4"))); }, "Invalid tree");
+        raisesError(function () { doNothingR(BTree.Node(BTree.Empty(), 4)); }, "Invalid tree");
+        raisesError(function () { doNothingR(4); }, "Invalid tree");
+        raisesError(function () { doNothingR(BTree.Node(BTree.Empty(), BTree.Leaf("4"))); }, "Invalid tree");
 
         ok(leftValueR(tree), "Valid lookup");
         strictEqual(leftValueR(BTree.Empty()), undefined, "Valid lookup");
@@ -1003,6 +1012,6 @@ $(document).ready(function() {
     test("Un-named type specifications supported", function() {
         var f = T("Int -> Int", function(a) { return a - 2; });
         strictEqual(f(4), 2, "Valid anonymous type restricted function");
-        raises(function() { f("foo"); }, "Anonymous type restriction enforced")
+        raisesError(function() { f("foo"); }, "Anonymous type restriction enforced")
     });
 });

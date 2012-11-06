@@ -38,7 +38,7 @@ function Contract(label) {
     this.relax = null;
     this.repr = function() { return "unknown" };
     this.label = label;
-    this.parent = function(x) { return "{ " + x + " }"; };
+    this.parent = function(x) { return "(% " + x + " %)"; };
     this.children = [];
     this.setParent = function(p) { 
         var oldParent = this.parent;
@@ -268,8 +268,6 @@ function ListContractFactory(itemContractFactory) {
 function MapContract(label, keyContract, valueContract) {
     Contract.bind(this)(label);
 
-    console.log(keyContract.repr(), valueContract.repr());
-
     this.children = [keyContract, valueContract];
     keyContract.setParent(function(x) { return "<" + x + " : " + valueContract.repr() + ">"});
     valueContract.setParent(function(x) { return "<" + keyContract.repr() + " : " + x + ">"});
@@ -382,7 +380,8 @@ function VariableContract(label, lock) {
             lock.type = getClass(x);
         } else if (lock.type != getClass(x)) {
             lock.ref = 0;
-            this.fail();
+            // this failure occurs in list values only.
+            this.fail(lock.type + " and " + getClass(x) + " values mixed in list");
         }
         lock.ref++;
         return new Seal(lock, x);
@@ -390,12 +389,15 @@ function VariableContract(label, lock) {
 
     this.restrict = function(sealedX) {
         lock.ref--;
+        if (!sealedX) {
+            this.fail("Expected sealed value but given undefined");
+        }
         if (!sealedX.lock) {
-            this.fail();
+            this.fail("Provided unsealed value");
         } else if (lock.key == sealedX.lock.key) {
             return sealedX.value;
         } else {
-            this.fail();
+            this.fail("Provided wrong sealed value");
         }
     }
 }
@@ -560,45 +562,71 @@ function FunctionContractFactory(domainFactory, rangeFactory, isRet) {
 
 function ObjectContract(label, name, fields) {
     Contract.bind(this)(label);
-    // TODO: why haven't the fields already had the label applied by this point?
+    // QUESTION: why haven't the fields already had the label applied by this point?
     // Other container contracts like FunctionContract recieve children that
     // have already had the label applied.
-    this.fields = fields.map(function(a) { return {name: a.name, contract: a.contract(label)}; });
+    // ANSWER: because this leads to a loop when making ADTs. A constructor like
+    // A = X A is converted into {0: A}, which makes an object contract with a field
+    // {name: 0, contract: f}. Note that f is a function output from ADTContractFactory,
+    // which when invoked will try to build contracts for each constructor, including X.
+    // Deferring object label application to resolve time means that this cycle is broken. 
+    this.preFields = fields;
+    this.fields = []
     this.name = name;
     this.lock = cryptographicKey++;
 
     this.children = this.fields;
 
-    this.setParent = function(x) { return x; }
+    // Defer calling setParent until fixFields has been invoked.
+    this._parent = undefined;
+    this._setParent = this.setParent;
+    this.setParent = function(p) { this._parent = p; }
 
     function fieldToRepr(field) {
         return field.name + ": " + field.contract.repr();
     }
 
     this.repr = function() {
-        return "{ " + this.fields.map(fieldToRepr).join(" , ") + " }";
+        return "{ " + this.fields.map(fieldToRepr).join(" , ") + " }" + (this.name ? " @ " + this.name : "");
     }
 
     this.childRepr = function(before, after, name, x) {
         var newlist = before.map(fieldToRepr);
         newlist.push(name + ": " + x);
         newlist = newlist.concat(after.map(fieldToRepr));
-        return "{ " + newlist.join(" , ") + " }"
+        return "{ " + newlist.join(" , ") + " }" + (this.name ? " @ " + this.name : "")
     }
 
-    this.fields.forEach(function(val, pos, array) {
-        val.contract.setParent(function(x) {
-            return this.childRepr(array.slice(0, pos), array.slice(pos + 1), val.name, x);
-        }.bind(this));
-    }.bind(this))
+    this.fixFields = function() {
+        if (this.fields.length != this.preFields.length) {
+            this.fields = fields.map(function(a) { return {name: a.name, contract: a.contract(label)}; });
+            this.fields.forEach(function(val, pos, array) {
+                val.contract.setParent(function(x) {
+                    return this.childRepr(array.slice(0, pos), array.slice(pos + 1), val.name, x);
+                }.bind(this));
+            }.bind(this));                
+        } 
+        this.children = this.fields.map(function(a) { return a.contract; });;
+        if (this._parent) {
+            this._setParent(this._parent);
+            this._parent = undefined;
+        }  
+    }
 
     this.restrict = function(x) {
         if (!is('Object', x)) { this.fail(this.expected(x)); }
-        if (this.name && x.__proto__.constructor.name != this.name) { this.fail(); }
+        if (this.name && x.__proto__.constructor.name != this.name) { 
+            this.fail("Expected " + this.name + " constructor but given " + x.__proto__.constructor.name); 
+        }
         var o = new Object();
+
+        this.fixFields();
+
         for (var i = 0; i < this.fields.length; i++) {
+
             var fieldName = this.fields[i].name;
             var contract = this.fields[i].contract;
+
             var infield = x[fieldName];
 
             if (infield != null && infield.bind) {
@@ -641,8 +669,12 @@ function ObjectContract(label, name, fields) {
     }
 
     this.relax = function(x) {
-        if (!is('Object', x)) { this.fail(); }
-        if (this.name && x.__proto__.constructor.name != this.name) { this.fail(); }
+        if (!is('Object', x)) { this.fail(this.expected(x)); }
+        if (this.name && x.__proto__.constructor.name != this.name) {
+            this.fail("Expected " + this.name + " constructor but given " + x.__proto__.constructor.name); 
+        }
+        this.fixFields();
+
         if (x.__reference__) {
             var o = x.__reference__(this, this.lock);
             for (var i = 0; i < this.fields.length; i++) {
@@ -790,6 +822,7 @@ function ADTContract(label, adtName, contracts) {
     var stringContract = StringContractFactory()(label);
 
     this.repr = function() {
+        console.log("ADTContract repr");
         var result = adtName + " = ";
         for (var c in contracts) {
             result +=  c + " : " + contracts[c].repr + " | "
@@ -832,15 +865,22 @@ function ADTContract(label, adtName, contracts) {
 
 ADTContract.prototype.__proto__ = Contract.prototype;
 
+_currentADT = undefined;
+
 function ADTContractFactory(adtName, contracts) {
     var f = function(label) {
         // Cannot generate contracts any earlier as these contracts may contain
         // the ADT itself, so the ADT contract must be created first.
         var builtContracts = {};
         // Generating contracts from strings
+        _currentADT = adtName;
         for (var c in contracts) {
             builtContracts[c] = buildContract(contracts[c])(label);
+            if (builtContracts[c].constructor.name != "ObjectContract") {
+                throw "This should always be an object contract: " + builtContracts[c];
+            }
         }
+        _currentADT = undefined;
         return new ADTContract(label, adtName, builtContracts);
     }
     f.repr = function() {return "ADTContractFactory(" + adtName + ")"};
