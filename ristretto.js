@@ -487,10 +487,13 @@ function FunctionContract(label, domain, range) {
                 return out;
             }
         } else {
+            // No extra layer needed - either the range is not a function (this is A -> B with A and B simple)
+            // or the domain is an EmptyContract (this is 0 -> A)
+            var fail = this.fail.bind(this);
             return function(x) {
                 var args = Array.prototype.slice.apply(arguments);
                 if (domain.__proto__.constructor == EmptyContract && args.length > 1) {
-                    this.fail();
+                    fail("function doesn't expect arguments but called with " + args);
                 }
                 var restOfArgs = args.slice(1);
                 var rDom = domain.relax(x);
@@ -508,7 +511,7 @@ function FunctionContract(label, domain, range) {
     }
 
     this.relax = function(f, numArgs) {
-        if (!is('Function', f)) { this.fail(); }
+        if (!is('Function', f)) { this.fail(this.expected(f)); }
         if (range.__proto__.constructor == FunctionContract &&
                 domain.__proto__.constructor != EmptyContract &&
                 (numArgs === undefined || numArgs > 1) &&
@@ -532,12 +535,13 @@ function FunctionContract(label, domain, range) {
                 return out;
             }
         } else {
+            var fail = this.fail.bind(this);            
             return function(x) {
                 // Rest of the arguments are captured and we continue to apply
                 // arguments in order to preserve identical behaviour in currying.
                 var args = Array.prototype.slice.apply(arguments);
                 if (domain.__proto__.constructor == EmptyContract && args.length > 1) {
-                    this.fail();
+                    fail("function doesn't expect arguments but called with " + args);
                 }
                 var restOfArgs = args.slice(1);            
                 var result = range.relax(f(domain.restrict(x)));
@@ -819,16 +823,13 @@ function EmptyContractFactory() {
 
 function ADTContract(label, adtName, contracts) {
     Contract.bind(this)(label);
-    var stringContract = StringContractFactory()(label);
+    var adtLabel = new Label(adtName + "." + label.name);
+    var stringContract = StringContractFactory()(adtLabel);
+    stringContract.setParent(function(x) { return adtName + "." + label.name + "(" + x + ")"});
+    this.name = adtName;
 
     this.repr = function() {
-        console.log("ADTContract repr");
-        var result = adtName + " = ";
-        for (var c in contracts) {
-            result +=  c + " : " + contracts[c].repr + " | "
-        }
-        result = result.substring(0, result.length - 3);
-        return result;
+        return adtName;
     }
 
     this.restrict = function(value) {
@@ -847,6 +848,9 @@ function ADTContract(label, adtName, contracts) {
     }
 
     this.relax = function(value) {
+        if (value.type === undefined || value.cons === undefined) {
+            this.fail();
+        }
         stringContract.relax(value.type);
         stringContract.relax(value.cons);
 
@@ -935,6 +939,9 @@ function buildContract(input) {
                 out = EmptyContractFactory();
                 pos += 1; // ->
                 range = parse();
+                if (!range) {
+                    throw "Can't use empty contract outside the context of a function";
+                }
                 out = FunctionContractFactory(EmptyContractFactory(), range);
             } else if (input[pos] == "(") {
                 pos += 1;

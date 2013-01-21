@@ -40,6 +40,7 @@ $(document).ready(function() {
     }
 
     function raisesError(f, name) {
+        try { _a._a } catch(e) { console.log(e.stack.split("\n")[2]); }
         try {
             f();
         } catch (e) {
@@ -499,9 +500,9 @@ $(document).ready(function() {
         raisesError(function() { getAgeR2({age: 15, name: 15}); }, "Invalid person, ref another typedef");
         strictEqual(getAgeR2({age: 15, name: "Joe", gender: "M"}), 15, "Valid person, adding attributes, ref another typedef");
 
-        raisesError(function() { T("typedef Int :: NotInt"); }, "Invalid typedef using reserved keywords");
-        raisesError(function() { T("typedef String :: NotString"); }, "Invalid typedef using reserved keywords");
-        raisesError(function() { T("typedef Bool :: NotBool"); }, "Invalid typedef using reserved keywords");
+        raises(function() { T("typedef Int :: NotInt"); }, "Invalid typedef using reserved keywords");
+        raises(function() { T("typedef String :: NotString"); }, "Invalid typedef using reserved keywords");
+        raises(function() { T("typedef Bool :: NotBool"); }, "Invalid typedef using reserved keywords");
 
     });
 
@@ -662,7 +663,7 @@ $(document).ready(function() {
         deepEqual(appendR([1,null,3], 4), [1,null,3,4], "[a?] Lists with nulls");
         raisesError(function() { appendR(null, 4); }, "[a?] Invalid list");
 
-        raisesError(function() {
+        raises(function() {
             var appendR2 = T("append :: forall a?. [a] -> a -> [a]", append);
         }, "forall a?. Invalid use of maybe");
 
@@ -684,10 +685,11 @@ $(document).ready(function() {
         strictEqual(lookupR("", {water: "liquid"}), undefined, "<b>? Valid lookup");
         strictEqual(lookupR("water", null), null, "<b>? Valid lookup with null map");
         raisesError(function() { lookupR(null, {water: "liquid"}); }, "<b>? Invalid lookup");
-        raisesError(function() { lookupR(water, {water: "liquid", steam: null}); }, "<b>? Invalid lookup");
+        raisesError(function() { lookupR("water", {water: "liquid", steam: null}); }, "<b>? Invalid lookup");
         strictEqual(lookupR("water", undefined), null, "<b>? Valid lookup with null map");
         raisesError(function() { lookupR(undefined, {water: "liquid"}); }, "<b>? Invalid lookup");
-        raisesError(function() { lookupR(water, {water: "liquid", steam: undefined}); }, "<b>? Invalid lookup");
+        raisesError(function() { lookupR("water", {water: "liquid", steam: undefined}); }, "<b>? Invalid lookup");
+        raisesError(function() { lookupR(7, {water: "liquid", steam: "gas"}); }, "<b>? Invalid lookup");
 
         // Objects
         function getName(person) {
@@ -786,8 +788,8 @@ $(document).ready(function() {
         }
 
         var getSizeR = T("getSize :: 0 -> Int", getSize);
-        raisesError(function () { T("getSize :: 0", getSize); }, "Invalid use of no params");
-        raisesError(function () { T("getSize :: Int -> 0", getSize); }, "Invalid use of no params");
+        raises(function () { T("getSize :: 0", getSize); }, "Invalid use of no params");
+        raises(function () { T("getSize :: Int -> 0", getSize); }, "Invalid use of no params");
 
         strictEqual(getSizeR(), 5000, "No parameters passed");
         raisesError(function () { getSizeR(500); }, "Calling empty function with params");
@@ -806,7 +808,7 @@ $(document).ready(function() {
         }
 
         var addR = T("add :: Int -> (0 -> Int) -> (0 -> Int)", add);
-        raisesError(function () { T("add :: Int -> (0 -> Int) -> 0", add); }, "Invalid use of no params");
+        raises(function () { T("add :: Int -> (0 -> Int) -> 0", add); }, "Invalid use of no params");
 
         strictEqual(addR(1000, getSize)(), 6000, "Valid chain of functions, explicit brackets");
 
