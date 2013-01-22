@@ -488,12 +488,19 @@ function FunctionContract(label, domain, range) {
             }
         } else {
             // No extra layer needed - either the range is not a function (this is A -> B with A and B simple)
-            // or the domain is an EmptyContract (this is 0 -> A)
+            // or the domain is an EmptyContract (this is 0 -> A).
             var fail = this.fail.bind(this);
+            if (domain.__proto__.constructor == EmptyContract && f.length > 0) {
+                fail("Function should not accept arguments");
+            } else if (f.length > 1) {
+                fail("Function should only accept a single argument");
+            }
             return function(x) {
                 var args = Array.prototype.slice.apply(arguments);
                 if (domain.__proto__.constructor == EmptyContract && args.length > 1) {
                     fail("function doesn't expect arguments but called with " + args);
+                } else if (args.length > 2) {
+                    fail("function only expects one argument but called with " + args);
                 }
                 var restOfArgs = args.slice(1);
                 var rDom = domain.relax(x);
