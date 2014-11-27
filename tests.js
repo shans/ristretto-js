@@ -21,11 +21,20 @@ tests simply open qunit.html in a web browser.
 Authors: Samuel Li <samli@codesphere.com> and Shane Stephens <shans@chromium.org>
 */
 
+var ready;
+if (typeof module !== 'undefined' && module.exports) {
+  Contract = require('ristretto');
+  ready = function(cb) { cb(); }
+} else {
+  ready = $(document).ready;
+}
+
 var T = Contract.T;
 var D = Contract.D;
+var raises = throws;
 
-$(document).ready(function() {
-    module("Basic types");
+ready(function() {
+    QUnit.module("Basic types");
 
     function sum(input) {
         var output = 0;
@@ -161,7 +170,7 @@ $(document).ready(function() {
         raisesError(function() { badSetValueR("undefined"); }, "Invalid function");
     });
 
-    module("Polymorphic tests");
+    QUnit.module("Polymorphic tests");
 
     test("a -> a functions", function () {
         function id(input) { return input; }
@@ -193,7 +202,7 @@ $(document).ready(function() {
         raisesError(function() { badIdR2("some string"); }, "Violates contract by replacing input, contract applied");
     });
 
-    module("Box tests");
+    QUnit.module("Box tests");
 
     test("a -> {field: a} functions", function () {
         function box(input) { return {field: input} };
@@ -215,7 +224,7 @@ $(document).ready(function() {
         raisesError(function() { badBoxR("ball"); }, "Invalid box with contract");
     });
 
-    module("Object tests");
+    QUnit.module("Object tests");
 
     test("Object restrictions", function () {
         function TestObject() {
@@ -315,7 +324,7 @@ $(document).ready(function() {
         raisesError(function() { badManipulateR(myObject); }, "Manipulating an object incorrectly");
     });
 
-    module("Map tests");
+    QUnit.module("Map tests");
 
     test("Using lists and maps", function () {
         var map = function(a, b) { return Array.prototype.map.call(a, function(x, y, z) { return b(x) }); }
@@ -395,7 +404,7 @@ $(document).ready(function() {
         strictEqual(addMoreR(10, 9, 8), 27, "Three input function, with contract");
     });
 
-    module("List tests");
+    QUnit.module("List tests");
 
     test("Pushing onto lists", function() {
         function append (list, item) {
@@ -443,7 +452,7 @@ $(document).ready(function() {
         raisesError(function() { getListR(0).push("asdf"); }, "Invalid append to list with contract");
     });
 
-    module("Dictionary tests");
+    QUnit.module("Dictionary tests");
 
     test("Looking up dictionaries", function() {
         function lookup(key, dict) {
@@ -478,7 +487,7 @@ $(document).ready(function() {
         raisesError(function() { badLookupR("3", {3: "foo", 4: 5}); }, "Bad lookup with contract");
     });
 
-    module("Typedef tests");
+    QUnit.module("Typedef tests");
 
     test("Declaring and using typedefs", function() {
         T("typedef Person :: {age: Int, name: String}");
@@ -589,7 +598,7 @@ $(document).ready(function() {
         raisesError(function() { parseR4(new invalidBufferedFileReader()); }, "Invalid reader passed in");
     });
 
-    module("Maybe tests");
+    QUnit.module("Maybe tests");
 
     test("Using the maybe type", function() {
         function nullable(num) {
@@ -744,7 +753,7 @@ $(document).ready(function() {
         raisesError(function() { applyR(lenR, ""); }, "Invalid parameters");
     });
 
-    module("Function tests");
+    QUnit.module("Function tests");
 
     test("Returning functions", function() {
         function getFn(num) {
@@ -780,7 +789,7 @@ $(document).ready(function() {
         strictEqual(addR(5, 2, 3)(""), 10, "More parameters, without brackets");
     });
 
-    module("No parameters");
+    QUnit.module("No parameters");
 
     test("Using no parameters using explicit brackets", function() {
         function getSize() {
@@ -865,7 +874,7 @@ $(document).ready(function() {
         strictEqual(getSetHealthR()()(70)(), 70, "Valid use of no params");
         strictEqual(getSetHealthR2()()(70)(), 70, "Valid use of no params, implicit bracketing");
     });
-    module("Algebraic data types");
+    QUnit.module("Algebraic data types");
 
     test("Basic ADTs", function() {
         var BTree = D("BTree = Empty | Leaf Int as value | Node BTree as left BTree");
@@ -1009,7 +1018,7 @@ $(document).ready(function() {
         strictEqual(depth(BTree.Node(BTree.Leaf("asd"), BTree.Leaf("hello"))), 501, "Valid depth function");
     });
 
-    module("Type specification parser");
+    QUnit.module("Type specification parser");
 
     test("Un-named type specifications supported", function() {
         var f = T("Int -> Int", function(a) { return a - 2; });
