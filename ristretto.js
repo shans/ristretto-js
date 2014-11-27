@@ -466,6 +466,7 @@ function FunctionContract(label, domain, range) {
                 // every input argument gets relaxed and the final output gets restricted appropriately.
                 // This only supports unary functions - i.e. if I have f :: A -> B -> C -> D then I 
                 // expect it to be called f(a)(b)(c).
+                var context = this;
                 var out = range.restrict(
                     function() {
                         var args2 = Array.prototype.slice.apply(arguments);
@@ -474,7 +475,7 @@ function FunctionContract(label, domain, range) {
                         if (domain.__proto__.constructor == ObjectContract) {
                             domain.restrict(args[0]);
                         }
-                        return f.apply(null, args2)
+                        return f.apply(context, args2)
                     }, numArgs == 0 ? undefined : numArgs - 1
                 );
 
@@ -497,7 +498,7 @@ function FunctionContract(label, domain, range) {
                 }
                 var restOfArgs = args.slice(1);
                 var rDom = domain.relax(x);
-                var out = f(rDom);
+                var out = f.call(this, rDom);
                 var result = range.restrict(out);
                 if (domain.__proto__.constructor == ObjectContract) {
                     domain.restrict(x);
