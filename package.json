@@ -2,7 +2,7 @@
   "name": "ristretto-js",
   "version": "0.1.1",
   "description": "Ristretto is a lightweight Javascript library which implements run-time type contracts in pure, unmodified Javascript.",
-  "main": "ristretto.min.js",
+  "main": "ristretto.js",
   "scripts": {
     "test": "./node_modules/.bin/qunit -c ristretto.js -t tests.js"
   },
