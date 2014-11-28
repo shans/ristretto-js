@@ -789,6 +789,176 @@ ready(function() {
         strictEqual(addR(5, 2, 3)(""), 10, "More parameters, without brackets");
     });
 
+    test("Method invocation preserves caller context", function() {
+        var a = {};
+        var b = {};
+
+        function fun(val) {
+            this.field = val;
+        }
+
+        var f = T("method :: String -> Unit", fun);
+
+        a.f = f;
+        b.f = f;
+
+        a.f('a');
+        strictEqual(a.field, 'a', 'function called on instance a');
+        equal(b.field, null, 'instance b unaffected');
+
+        b.f('b');
+        strictEqual(a.field, 'a', 'instance a unaffected');
+        strictEqual(b.field, 'b', 'function called on instance b');
+    });
+
+    test("Constructor invocation preserves caller context", function() {
+        function Foo(val) {
+            this.val = val;
+        }
+
+        TFoo = T('constructor :: String -> Unit', Foo);
+
+        TFoo.prototype.inspect = T('inspect :: String -> String', function(arg) {
+            return this.val + '-' + arg;
+        });
+
+        raisesError(function() { new TFoo(1); }, 'invalid constructor function argument type');
+
+        var a = new TFoo('a');
+        strictEqual(a.val, 'a', 'object a field is set by constructor');
+        strictEqual(a.inspect('1'), 'a-1', 'object a method observes instance context');
+
+        var b = new TFoo('b');
+        strictEqual(a.val, 'a', 'object a is unaffected');
+        strictEqual(a.inspect('1'), 'a-1', 'object a is unaffected');
+        strictEqual(b.val, 'b', 'object b field is set by constructor');
+        strictEqual(b.inspect('2'), 'b-2', 'object b method observes instance context');
+    });
+
+    test("Returned function invocation preserves caller context", function() {
+        var a = {};
+        var b = {};
+
+        function fun(val) {
+            this.field = val;
+        }
+        function returnFunc(f) {
+            return f;
+        }
+        var f = T("method :: String -> Unit", fun);
+        var rf = T("returnFunc :: (String -> Unit) -> (String -> Unit)", returnFunc);
+
+        a.f = rf(f);
+        b.f = rf(f);
+
+        a.f('a');
+        strictEqual(a.field, 'a', 'function called on instance a');
+        equal(b.field, null, 'instance b unaffected');
+
+        b.f('b');
+        strictEqual(a.field, 'a', 'instance a unaffected');
+        strictEqual(b.field, 'b', 'function called on instance b');
+    });
+
+    test("Inheritance preserves context", function() {
+        function Animal(name) {
+            this.name = name;
+        }
+        Animal.prototype.emit = T('emit :: 0 -> String', function () {
+            // the descendant class defines the sound
+            sound = this.constructor.sound;
+            return sound + sound + sound;
+        });
+        function Cat(name) {
+            Animal.call(this, name);
+        }
+        Cat.sound = 'Meow!';
+        Cat.prototype = Object.create(Animal.prototype);
+        Cat.prototype.constructor = Cat;
+        Cat.prototype.pet = T('pet :: 0 -> String', function() {
+            this.petted = true;
+            return this.name + ': ' + this.emit();
+        });
+        function Dog(name) {
+            Animal.call(this, name);
+        }
+        Dog.sound = 'Bark!';
+
+        Dog.prototype = Object.create(Animal.prototype);
+        Dog.prototype.constructor = Dog;
+        Dog.prototype.scratch = T('scratch :: 0 -> String', function() {
+            this.scratched = true;
+            return this.name + ': ' + this.emit();
+        });
+
+        var c1 = new Cat('fluffy');
+        var c2 = new Cat('smokey');
+        var d1 = new Dog('max');
+        var d2 = new Dog('roger');
+
+        strictEqual(c1.constructor, Cat, 'cat instance has correct constructor');
+        strictEqual(c1.name, 'fluffy');
+        strictEqual(c1.pet(), 'fluffy: Meow!Meow!Meow!');
+        strictEqual(c1.petted, true);
+        equal(c2.petted, null);
+        equal(d1.petted, null);
+        equal(d2.petted, null);
+
+        strictEqual(c2.constructor, Cat, 'cat instance has correct constructor');
+        strictEqual(c2.name, 'smokey');
+        strictEqual(c2.pet(), 'smokey: Meow!Meow!Meow!');
+        strictEqual(c2.petted, true);
+        equal(d1.petted, null);
+        equal(d2.petted, null);
+
+        strictEqual(d1.constructor, Dog, 'dog instance has correct constructor');
+        strictEqual(d1.name, 'max');
+        strictEqual(d1.scratch(), 'max: Bark!Bark!Bark!');
+        strictEqual(d1.scratched, true);
+        equal(c1.scratched, null);
+        equal(c2.scratched, null);
+        equal(d2.scratched, null);
+
+        strictEqual(d2.constructor, Dog, 'dog instance has correct constructor');
+        strictEqual(d2.name, 'roger');
+        strictEqual(d2.scratch(), 'roger: Bark!Bark!Bark!');
+        strictEqual(d2.scratched, true);
+        equal(c1.scratched, null);
+        equal(c2.scratched, null);
+    });
+
+    test("Multiple levels of function indirection preserves caller context", function() {
+        var a = {};
+        var b = {};
+
+        function fun(val) {
+            this.field = val;
+        }
+        // a function can only have ONE spec applied
+        function returnFunc(f) {
+            return f;
+        }
+        // a function can only have ONE spec applied
+        //function returnFunc2(f) {
+        //    return f;
+        //}
+        var f = T("method :: String -> Unit", fun);
+        var rf = T("returnFunc :: (String -> Unit) -> (String -> Unit)", returnFunc);
+        var rrf = T("returnReturnFunc :: ((String -> Unit) -> (String -> Unit)) -> ((String -> Unit) -> (String -> Unit))", returnFunc);
+
+        a.f = rrf(rf)(f);
+        b.f = rrf(rf)(f);
+
+        a.f('a');
+        strictEqual(a.field, 'a', 'function called on instance a');
+        equal(b.field, null, 'instance b unaffected');
+
+        b.f('b');
+        strictEqual(a.field, 'a', 'instance a unaffected');
+        strictEqual(b.field, 'b', 'function called on instance b');
+    });
+
+
     QUnit.module("No parameters");
 
     test("Using no parameters using explicit brackets", function() {
