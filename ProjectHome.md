@@ -1,0 +1,3 @@
+Ristretto is a lightweight Javascript library which implements run-time type contracts in pure, unmodified Javascript. It allows Javascript programmers to ensure type safety, as well as more structured code but also strengthens the language in providing extended functionality like algebraic data types and currying of functions.
+
+See the [User Guide](Documentation.md) for information on how to use ristretto in your own Javascript project.
