@@ -21,11 +21,20 @@ tests simply open qunit.html in a web browser.
 Authors: Samuel Li <samli@codesphere.com> and Shane Stephens <shans@chromium.org>
 */
 
+var ready;
+if (typeof module !== 'undefined' && module.exports) {
+  Contract = require('ristretto');
+  ready = function(cb) { cb(); }
+} else {
+  ready = $(document).ready;
+}
+
 var T = Contract.T;
 var D = Contract.D;
+var raises = throws;
 
-$(document).ready(function() {
-    module("Basic types");
+ready(function() {
+    QUnit.module("Basic types");
 
     function sum(input) {
         var output = 0;
@@ -161,7 +170,7 @@ $(document).ready(function() {
         raisesError(function() { badSetValueR("undefined"); }, "Invalid function");
     });
 
-    module("Polymorphic tests");
+    QUnit.module("Polymorphic tests");
 
     test("a -> a functions", function () {
         function id(input) { return input; }
@@ -193,7 +202,7 @@ $(document).ready(function() {
         raisesError(function() { badIdR2("some string"); }, "Violates contract by replacing input, contract applied");
     });
 
-    module("Box tests");
+    QUnit.module("Box tests");
 
     test("a -> {field: a} functions", function () {
         function box(input) { return {field: input} };
@@ -215,7 +224,7 @@ $(document).ready(function() {
         raisesError(function() { badBoxR("ball"); }, "Invalid box with contract");
     });
 
-    module("Object tests");
+    QUnit.module("Object tests");
 
     test("Object restrictions", function () {
         function TestObject() {
@@ -315,7 +324,7 @@ $(document).ready(function() {
         raisesError(function() { badManipulateR(myObject); }, "Manipulating an object incorrectly");
     });
 
-    module("Map tests");
+    QUnit.module("Map tests");
 
     test("Using lists and maps", function () {
         var map = function(a, b) { return Array.prototype.map.call(a, function(x, y, z) { return b(x) }); }
@@ -395,7 +404,7 @@ $(document).ready(function() {
         strictEqual(addMoreR(10, 9, 8), 27, "Three input function, with contract");
     });
 
-    module("List tests");
+    QUnit.module("List tests");
 
     test("Pushing onto lists", function() {
         function append (list, item) {
@@ -443,7 +452,7 @@ $(document).ready(function() {
         raisesError(function() { getListR(0).push("asdf"); }, "Invalid append to list with contract");
     });
 
-    module("Dictionary tests");
+    QUnit.module("Dictionary tests");
 
     test("Looking up dictionaries", function() {
         function lookup(key, dict) {
@@ -478,7 +487,7 @@ $(document).ready(function() {
         raisesError(function() { badLookupR("3", {3: "foo", 4: 5}); }, "Bad lookup with contract");
     });
 
-    module("Typedef tests");
+    QUnit.module("Typedef tests");
 
     test("Declaring and using typedefs", function() {
         T("typedef Person :: {age: Int, name: String}");
@@ -589,7 +598,7 @@ $(document).ready(function() {
         raisesError(function() { parseR4(new invalidBufferedFileReader()); }, "Invalid reader passed in");
     });
 
-    module("Maybe tests");
+    QUnit.module("Maybe tests");
 
     test("Using the maybe type", function() {
         function nullable(num) {
@@ -744,7 +753,7 @@ $(document).ready(function() {
         raisesError(function() { applyR(lenR, ""); }, "Invalid parameters");
     });
 
-    module("Function tests");
+    QUnit.module("Function tests");
 
     test("Returning functions", function() {
         function getFn(num) {
@@ -780,7 +789,177 @@ $(document).ready(function() {
         strictEqual(addR(5, 2, 3)(""), 10, "More parameters, without brackets");
     });
 
-    module("No parameters");
+    test("Method invocation preserves caller context", function() {
+        var a = {};
+        var b = {};
+
+        function fun(val) {
+            this.field = val;
+        }
+
+        var f = T("method :: String -> Unit", fun);
+
+        a.f = f;
+        b.f = f;
+
+        a.f('a');
+        strictEqual(a.field, 'a', 'function called on instance a');
+        equal(b.field, null, 'instance b unaffected');
+
+        b.f('b');
+        strictEqual(a.field, 'a', 'instance a unaffected');
+        strictEqual(b.field, 'b', 'function called on instance b');
+    });
+
+    test("Constructor invocation preserves caller context", function() {
+        function Foo(val) {
+            this.val = val;
+        }
+
+        TFoo = T('constructor :: String -> Unit', Foo);
+
+        TFoo.prototype.inspect = T('inspect :: String -> String', function(arg) {
+            return this.val + '-' + arg;
+        });
+
+        raisesError(function() { new TFoo(1); }, 'invalid constructor function argument type');
+
+        var a = new TFoo('a');
+        strictEqual(a.val, 'a', 'object a field is set by constructor');
+        strictEqual(a.inspect('1'), 'a-1', 'object a method observes instance context');
+
+        var b = new TFoo('b');
+        strictEqual(a.val, 'a', 'object a is unaffected');
+        strictEqual(a.inspect('1'), 'a-1', 'object a is unaffected');
+        strictEqual(b.val, 'b', 'object b field is set by constructor');
+        strictEqual(b.inspect('2'), 'b-2', 'object b method observes instance context');
+    });
+
+    test("Returned function invocation preserves caller context", function() {
+        var a = {};
+        var b = {};
+
+        function fun(val) {
+            this.field = val;
+        }
+        function returnFunc(f) {
+            return f;
+        }
+        var f = T("method :: String -> Unit", fun);
+        var rf = T("returnFunc :: (String -> Unit) -> (String -> Unit)", returnFunc);
+
+        a.f = rf(f);
+        b.f = rf(f);
+
+        a.f('a');
+        strictEqual(a.field, 'a', 'function called on instance a');
+        equal(b.field, null, 'instance b unaffected');
+
+        b.f('b');
+        strictEqual(a.field, 'a', 'instance a unaffected');
+        strictEqual(b.field, 'b', 'function called on instance b');
+    });
+
+    test("Inheritance preserves context", function() {
+        function Animal(name) {
+            this.name = name;
+        }
+        Animal.prototype.emit = T('emit :: 0 -> String', function () {
+            // the descendant class defines the sound
+            sound = this.constructor.sound;
+            return sound + sound + sound;
+        });
+        function Cat(name) {
+            Animal.call(this, name);
+        }
+        Cat.sound = 'Meow!';
+        Cat.prototype = Object.create(Animal.prototype);
+        Cat.prototype.constructor = Cat;
+        Cat.prototype.pet = T('pet :: 0 -> String', function() {
+            this.petted = true;
+            return this.name + ': ' + this.emit();
+        });
+        function Dog(name) {
+            Animal.call(this, name);
+        }
+        Dog.sound = 'Bark!';
+
+        Dog.prototype = Object.create(Animal.prototype);
+        Dog.prototype.constructor = Dog;
+        Dog.prototype.scratch = T('scratch :: 0 -> String', function() {
+            this.scratched = true;
+            return this.name + ': ' + this.emit();
+        });
+
+        var c1 = new Cat('fluffy');
+        var c2 = new Cat('smokey');
+        var d1 = new Dog('max');
+        var d2 = new Dog('roger');
+
+        strictEqual(c1.constructor, Cat, 'cat instance has correct constructor');
+        strictEqual(c1.name, 'fluffy');
+        strictEqual(c1.pet(), 'fluffy: Meow!Meow!Meow!');
+        strictEqual(c1.petted, true);
+        equal(c2.petted, null);
+        equal(d1.petted, null);
+        equal(d2.petted, null);
+
+        strictEqual(c2.constructor, Cat, 'cat instance has correct constructor');
+        strictEqual(c2.name, 'smokey');
+        strictEqual(c2.pet(), 'smokey: Meow!Meow!Meow!');
+        strictEqual(c2.petted, true);
+        equal(d1.petted, null);
+        equal(d2.petted, null);
+
+        strictEqual(d1.constructor, Dog, 'dog instance has correct constructor');
+        strictEqual(d1.name, 'max');
+        strictEqual(d1.scratch(), 'max: Bark!Bark!Bark!');
+        strictEqual(d1.scratched, true);
+        equal(c1.scratched, null);
+        equal(c2.scratched, null);
+        equal(d2.scratched, null);
+
+        strictEqual(d2.constructor, Dog, 'dog instance has correct constructor');
+        strictEqual(d2.name, 'roger');
+        strictEqual(d2.scratch(), 'roger: Bark!Bark!Bark!');
+        strictEqual(d2.scratched, true);
+        equal(c1.scratched, null);
+        equal(c2.scratched, null);
+    });
+
+    test("Multiple levels of function indirection preserves caller context", function() {
+        var a = {};
+        var b = {};
+
+        function fun(val) {
+            this.field = val;
+        }
+        // a function can only have ONE spec applied
+        function returnFunc(f) {
+            return f;
+        }
+        // a function can only have ONE spec applied
+        //function returnFunc2(f) {
+        //    return f;
+        //}
+        var f = T("method :: String -> Unit", fun);
+        var rf = T("returnFunc :: (String -> Unit) -> (String -> Unit)", returnFunc);
+        var rrf = T("returnReturnFunc :: ((String -> Unit) -> (String -> Unit)) -> ((String -> Unit) -> (String -> Unit))", returnFunc);
+
+        a.f = rrf(rf)(f);
+        b.f = rrf(rf)(f);
+
+        a.f('a');
+        strictEqual(a.field, 'a', 'function called on instance a');
+        equal(b.field, null, 'instance b unaffected');
+
+        b.f('b');
+        strictEqual(a.field, 'a', 'instance a unaffected');
+        strictEqual(b.field, 'b', 'function called on instance b');
+    });
+
+
+    QUnit.module("No parameters");
 
     test("Using no parameters using explicit brackets", function() {
         function getSize() {
@@ -865,7 +1044,7 @@ $(document).ready(function() {
         strictEqual(getSetHealthR()()(70)(), 70, "Valid use of no params");
         strictEqual(getSetHealthR2()()(70)(), 70, "Valid use of no params, implicit bracketing");
     });
-    module("Algebraic data types");
+    QUnit.module("Algebraic data types");
 
     test("Basic ADTs", function() {
         var BTree = D("BTree = Empty | Leaf Int as value | Node BTree as left BTree");
@@ -1009,7 +1188,7 @@ $(document).ready(function() {
         strictEqual(depth(BTree.Node(BTree.Leaf("asd"), BTree.Leaf("hello"))), 501, "Valid depth function");
     });
 
-    module("Type specification parser");
+    QUnit.module("Type specification parser");
 
     test("Un-named type specifications supported", function() {
         var f = T("Int -> Int", function(a) { return a - 2; });

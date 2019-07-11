@@ -1,0 +1,27 @@
+{
+  "name": "ristretto-js",
+  "version": "0.1.1",
+  "description": "Ristretto is a lightweight Javascript library which implements run-time type contracts in pure, unmodified Javascript.",
+  "main": "ristretto.js",
+  "scripts": {
+    "test": "./node_modules/.bin/qunit -c ristretto.js -t tests.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ahamid/ristretto-js.git"
+  },
+  "keywords": [
+    "javascript",
+    "contract",
+    "type",
+    "safety"
+  ],
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/shans/ristretto-js/issues"
+  },
+  "homepage": "https://github.com/shans/ristretto-js",
+  "devDependencies": {
+    "qunit": "*"
+  }
+}
